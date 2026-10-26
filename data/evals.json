@@ -61,5 +61,40 @@
     "reference": "Should say the handbook does not cover the dress code. Must not invent a policy.",
     "section": null,
     "type": "unanswerable"
+  },
+  {
+    "id": 10,
+    "question": "Can I work from my sofa all week?",
+    "reference": "The employees can work remotely for upto 3 days a week, fully remote arrangements require approval from a department head and are reviewed every 6 months. Employees working remotely must be reachable during core hours. A home office stipend of 500 USD is available once, within the first 90 days of employment. Must not invent a policy.",
+    "section": 6,
+    "type": "answerable"
+  },
+  {
+    "id": 11,
+    "question": "What is the most I can spend on a hotel in Tokyo?",
+    "reference": "Hotel stays are reimbursed up to 180 USD per night in standard cities and 250 USD per night in high-cost cities such as New York, London, and Tokyo.",
+    "section": 7,
+    "type": "answerable"
+  },
+  {
+    "id": 12,
+    "question": "Do I get free money for a standing desk?",
+    "reference": "There is a one-time home office stipend of 500 USD, available within the first 90 days of employment. The handbook does not say what the stipend covers, so it cannot confirm that a standing desk qualifies. A good answer mentions the stipend and says it is unclear whether a standing desk is covered.",
+    "section": 6,
+    "type": "partial"
+  },
+  {
+    "id": 14,
+    "question": "Can I bring my dog to the office?",
+    "reference": "The handbook does not cover this policy.",
+    "section": null,
+    "type": "unanswerable"
+  },
+  {
+    "id": 15,
+    "question": "I am traveling for work, what can I claim and how fast?",
+    "reference": "Business travel must be booked through the company travel portal. Economy class is required for flights under 6 hours. For flights over 6 hours, premium economy is allowed. Hotel stays are reimbursed up to 180 USD per night in standard cities and 250 USD per night in high-cost cities such as New York, London, and Tokyo. During business travel, employees receive a daily meal allowance of 60 USD. This covers breakfast, lunch, and dinner. Alcohol is not reimbursable. Meals with clients can be claimed separately with an itemized receipt and the names of attendees. Expense claims must be submitted within 30 days of the expense. Claims over 100 USD require a receipt. Claims submitted after 30 days are rejected unless a manager approves an exception in writing. Reimbursement is paid with the next monthly payroll.",
+    "section": 7,
+    "type": "answerable"
   }
 ]
