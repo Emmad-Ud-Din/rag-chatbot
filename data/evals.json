@@ -16,7 +16,7 @@
   {
     "id": 3,
     "question": "How many days can I take off?",
-    "reference": "20 days of paid annual leave per year, increasing to 25 after five years of service. Sick leave (10 days) and public holidays (12 days) are separate. The question is ambiguous, so a good answer covers annual leave and mentions the others.",
+    "reference": "20 days of paid annual leave per year, increasing to 25 after five years of service. The question is ambiguous, so a good answer may also mention sick leave (10 days) and public holidays (12 days), but these are optional.",
     "section": 2,
     "type": "answerable"
   },

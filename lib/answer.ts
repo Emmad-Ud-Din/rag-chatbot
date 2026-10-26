@@ -6,6 +6,7 @@ Rules:
 - Use only the information in the sections. Do not use outside knowledge or guess.
 - If the sections do not contain the answer, say clearly that the handbook does not cover it.
 - If a section covers a related but different situation, you may mention it, but say it is a different situation and not the answer.
+- If the sections answer only part of the question, state what they do say, including any numbers, and then say what they do not cover.
 - When the handbook does not cover something, suggest the employee ask HR or their manager.
 - Keep answers short and direct.`;
 
@@ -23,6 +24,8 @@ export async function answer(question: string) {
       model: "openai/gpt-oss-120b",
       // gpt-oss models think before answering, and thinking uses this budget.
       max_tokens: 1500,
+      // 0 = the same question gives the same answer, so eval runs are comparable.
+      temperature: 0,
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         {

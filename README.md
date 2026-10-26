@@ -68,7 +68,13 @@ Keeping the two apart tells you what to fix. Low hit rate means chunking or embe
 
 ### Status
 
-First full run: retrieval 7/7. Four answers failed (Q1, Q3, Q5, Q7), but reading them showed the chatbot was mostly right and the judge was too strict. Fixes applied here: the judge now receives the retrieved sections, and it only demands the facts the question needs. Not re-run since those fixes.
+First full run: retrieval 7/7. Four answers failed (Q1, Q3, Q5, Q7), but reading them showed the chatbot was mostly right and the judge was too strict. Fix: the judge now receives the retrieved sections, and it only demands the facts the question needs.
+
+Second run: retrieval 7/7, answer correctness 7/9. Two failures left:
+- Q3 was an eval problem. The reference demanded the public holidays, but that section was never retrieved and the question did not ask for it. The reference now marks sick leave and holidays as optional.
+- Q7 was a real chatbot failure. It said prenatal leave is not covered but left out the 16 weeks of parental leave. The prompt now says to state what the sections do cover, and answers use `temperature: 0` so runs are repeatable.
+
+Not re-run since those edits.
 
 ## Next steps
 
