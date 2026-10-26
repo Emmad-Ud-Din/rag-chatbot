@@ -1,5 +1,8 @@
-node_modules/
 .env
 .env.local
-.next/
+__pycache__/
+*.pyc
+.venv/
+venv/
 *.log
+data/index.json
