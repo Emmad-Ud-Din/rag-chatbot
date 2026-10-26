@@ -1,0 +1,65 @@
+[
+  {
+    "id": 1,
+    "question": "What are the working hours?",
+    "reference": "Core hours are 10:00 to 16:00, Monday to Friday. The remaining hours are flexible as long as the week totals 40 hours.",
+    "section": 1,
+    "type": "answerable"
+  },
+  {
+    "id": 2,
+    "question": "Is overtime paid for?",
+    "reference": "Approved overtime is compensated with time off in lieu, taken within 60 days. It must be approved by a manager in advance. It is not paid as money.",
+    "section": 1,
+    "type": "answerable"
+  },
+  {
+    "id": 3,
+    "question": "How many days can I take off?",
+    "reference": "20 days of paid annual leave per year, increasing to 25 after five years of service. Sick leave (10 days) and public holidays (12 days) are separate. The question is ambiguous, so a good answer covers annual leave and mentions the others.",
+    "section": 2,
+    "type": "answerable"
+  },
+  {
+    "id": 4,
+    "question": "Are my leaves carried forward if unused?",
+    "reference": "Up to 5 unused annual leave days carry over to the next year and expire on March 31. Sick days do not carry over.",
+    "section": 2,
+    "type": "answerable"
+  },
+  {
+    "id": 5,
+    "question": "Do I have sick leave?",
+    "reference": "Yes, 10 paid sick days per year. They do not carry over. A doctor's note is required for absences longer than 3 consecutive days.",
+    "section": 3,
+    "type": "answerable"
+  },
+  {
+    "id": 6,
+    "question": "Are sick leave and annual leave counted together?",
+    "reference": "No. Sick leave is separate from annual leave and does not reduce it.",
+    "section": 3,
+    "type": "answerable"
+  },
+  {
+    "id": 7,
+    "question": "Is there any maternal leave in case of pregnancy?",
+    "reference": "Primary caregivers get 16 weeks of paid parental leave, which must begin within 6 months of the birth or adoption. The handbook says nothing about leave before the birth. A good answer gives the 16 weeks and says that pre-birth leave is not covered.",
+    "section": 5,
+    "type": "partial"
+  },
+  {
+    "id": 8,
+    "question": "What should I do if my laptop got damaged?",
+    "reference": "Should say the handbook does not cover damaged laptops. May mention the lost or stolen rule (report to IT within 24 hours), but must not present it as the rule for damage.",
+    "section": null,
+    "type": "unanswerable"
+  },
+  {
+    "id": 9,
+    "question": "What is the dress code?",
+    "reference": "Should say the handbook does not cover the dress code. Must not invent a policy.",
+    "section": null,
+    "type": "unanswerable"
+  }
+]
