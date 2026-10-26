@@ -74,7 +74,11 @@ Second run: retrieval 7/7, answer correctness 7/9. Two failures left:
 - Q3 was an eval problem. The reference demanded the public holidays, but that section was never retrieved and the question did not ask for it. The reference now marks sick leave and holidays as optional.
 - Q7 was a real chatbot failure. It said prenatal leave is not covered but left out the 16 weeks of parental leave. The prompt now says to state what the sections do cover, and answers use `temperature: 0` so runs are repeatable.
 
-Not re-run since those edits.
+Third run, after adding paraphrased questions (Q10 to Q15): retrieval 11/11, answer correctness 14/14. Getting there took two more changes:
+- Q12 (standing desk) was relabeled `partial`, because the handbook never says what the home office stipend covers.
+- The bot kept denying the stipend until a reminder was added right after the question in the user message. A prompt example alone did not fix it, and `reasoning_effort: "high"` turned out to be unnecessary.
+
+Known issue: reading the passing answers shows the bot sometimes makes false claims about what the whole handbook lacks. It only sees the top 3 sections, so in Q4 it said the handbook does not mention parental leave (section 5 covers it, it just was not retrieved), and in Q11 it said the handbook does not say how to claim expenses (section 9 does). The judge cannot catch these, because it sees the same 3 sections the bot saw. A 14/14 score does not mean those answers are clean.
 
 ## Next steps
 
