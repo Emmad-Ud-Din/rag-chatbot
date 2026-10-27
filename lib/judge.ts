@@ -1,3 +1,11 @@
+import fs from "fs";
+
+// The whole handbook, given to the judge as ground truth. The bot only sees the
+// top 3 sections, so without this the judge cannot tell a true extra detail from
+// an invented one, or a false "the handbook does not cover X" from a true one.
+// This only works because the handbook is small.
+const HANDBOOK = fs.readFileSync("data/handbook.md", "utf-8");
+
 const JUDGE_PROMPT = `You grade answers from an employee handbook chatbot.
 You are given a question, its type, a reference, the handbook sections the system retrieved, and the system's answer.
 The reference is not handbook text. It is either the correct answer, or, for partial and unanswerable questions, a description of the correct behavior.
@@ -19,7 +27,10 @@ unanswerable:
 - INCORRECT if it presents any rule, number, deadline, or procedure as the answer.
 
 For all types:
-- A detail that is not in the reference is fine if it appears in the handbook sections provided. It is INCORRECT only if the detail appears in neither the reference nor the sections.
+- Before deciding, find every sentence in the answer that says the handbook does not mention, state, specify, provide, or cover something. Check each one against the full handbook. If any of them is false because the full handbook does cover it, the verdict is INCORRECT, even if the rest of the answer is right.
+- The full handbook is provided as ground truth. A detail that is not in the reference is fine if it appears anywhere in the full handbook. It is INCORRECT only if it appears nowhere in it.
+- INCORRECT if the answer says the handbook does not mention or cover something that the full handbook does cover, even if that part was not among the retrieved sections.
+- INCORRECT if the answer states or implies a rule, eligibility, or procedure the full handbook does not contain, for example by saying a rule about one situation also applies to a different one.
 - Suggesting the employee ask HR or their manager is fine.
 
 Reply format: the first word must be exactly CORRECT or INCORRECT, followed by one or two sentences explaining why.`;
@@ -49,6 +60,7 @@ export async function judge(
             `Question type: ${item.type}\n` +
             `Reference: ${item.reference}\n` +
             `Handbook sections the system retrieved:\n${sources}\n\n` +
+            `Full handbook (ground truth):\n${HANDBOOK}\n\n` +
             `System answer: ${answer}`,
         },
       ],

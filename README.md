@@ -80,10 +80,21 @@ Third run, after adding paraphrased questions (Q10 to Q15): retrieval 11/11, ans
 
 Known issue: reading the passing answers shows the bot sometimes makes false claims about what the whole handbook lacks. It only sees the top 3 sections, so in Q4 it said the handbook does not mention parental leave (section 5 covers it, it just was not retrieved), and in Q11 it said the handbook does not say how to claim expenses (section 9 does). The judge cannot catch these, because it sees the same 3 sections the bot saw. A 14/14 score does not mean those answers are clean.
 
+Fix for that issue: the judge now receives the full handbook as ground truth and fails any answer that claims the handbook does not cover something it does cover. The reminder in the user message also tells the bot to stop when the sections fully answer the question, and to say which part is missing when they answer only part. `npm run evals` now prints sections, answer and judge reason for every question, and counts "does not mention/specify/..." claims on answerable questions as `ABSENCE CLAIM, check by hand`.
+
+Fourth run, with 7 held-out questions (Q11 to Q17, written after the prompt was tuned): retrieval 14/14, answer correctness 17/17. The fixes held on questions the prompt was not tuned on, but 7 is a small sample.
+
+`data/evals.json` now has 21 questions: the original 10, the 7 held-out ones, and 4 more (Tokyo hotel, standing desk, dog, travel claim).
+
+Known weak spots:
+- The judge may pass a soft borrowed rule (case E in `npm run judge:test`: "reporting damage to IT follows the same principle"). Run `try-judge` after any judge prompt change.
+- Answers vary slightly between runs even at `temperature: 0`.
+- Questions that need several sections are only checked against one section.
+
 ## Next steps
 
-- Re-run `npm run evals` and read every FAIL to decide whether the system or the judge was wrong
-- Add paraphrased questions to `evals.json` ("can I work from my sofa?", "hotel limit in Tokyo?")
+- Run `npm run evals` on the 21 questions and read every answer, not only the FAILs
+- Add more held-out questions, including ones that need several sections
 - Streaming chat UI in Next.js (`app/`)
 - Log the question, retrieved chunks and answer for every request
 - Later: reranking, hybrid search, structured outputs
