@@ -6,6 +6,7 @@
 
 import json
 import re
+import sys
 import time
 from pathlib import Path
 
@@ -30,12 +31,21 @@ ABSENCE = re.compile(
 def main() -> None:
     evals = json.loads(Path("data/evals.json").read_text(encoding="utf-8"))
 
+    # Optional: run only some ids, e.g. `python run_evals.py 10 8`.
+    # With no ids, all questions run. Saves tokens when checking one question.
+    only = [int(a) for a in sys.argv[1:]]
+    selected = [e for e in evals if e["id"] in only] if only else evals
+
+    if not selected:
+        print("No questions match those ids.")
+        return
+
     scorable = 0
     hits = 0
     passes = 0
     absence_claims = 0
 
-    for e in evals:
+    for i, e in enumerate(selected):
         result = answer(e["question"])
         sections = [c["section"] for c in result["chunks"]]
 
@@ -49,8 +59,8 @@ def main() -> None:
             else:
                 retrieval = "MISS"
 
-        # The judge sees the same sections the chatbot saw, so it can tell a true
-        # extra detail from an invented one.
+        # The judge sees the same sections the chatbot saw, plus the full handbook
+        # (added inside judge.py), so it can tell a true extra detail from an invented one.
         sources = "\n\n---\n\n".join(c["text"] for c in result["chunks"])
         verdict = judge(e, result["answer"], sources)
         if verdict.passed:
@@ -70,10 +80,12 @@ def main() -> None:
             absence_claims += 1
             print("   ABSENCE CLAIM, check by hand")
 
-        time.sleep(PAUSE_SECONDS)
+        # No point waiting after the last question.
+        if i < len(selected) - 1:
+            time.sleep(PAUSE_SECONDS)
 
     print(f"\nRetrieval hit rate: {hits}/{scorable}")
-    print(f"Answer correctness: {passes}/{len(evals)}")
+    print(f"Answer correctness: {passes}/{len(selected)}")
     print(f"Answerable questions with absence claims: {absence_claims}")
 
 

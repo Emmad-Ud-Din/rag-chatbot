@@ -80,8 +80,14 @@ How it got there:
 - That reminder also had to say what to do for partial answers, otherwise the partial questions (Q7, Q12) lost the "what is not covered" part.
 - The bot volunteered false statements like "the handbook does not mention parental leave" because it only sees the top 3 sections. `run_evals.py` counts those phrases on answerable questions (about 7 before the reminder fix, 0 to 2 after).
 
+Latest TypeScript run: 20/21. Q10 ("can I work from my sofa every day?") failed once and passed twice on re-runs. The bot gave the right rule every time but added "the handbook does not say whether working from a sofa is allowed, ask HR", which is true but puts doubt on something the rule already answers. Changes, ported here too:
+- The judge now writes a check line for every "the handbook does not ..." sentence (`true: yes/no`, `matters: yes/no`), and code combines them into the verdict. Before this, the judge once wrote `matters: no` and still said CORRECT.
+- Only `true: no` fails an answer. `matters` flipped between runs on the same input, so it is printed for reading but not enforced. Needless disclaimers are caught by the ABSENCE flag and a human look instead.
+- The reminder in `rag/answer.py` now says a detail only counts as an uncovered part if the answer would be different depending on what the handbook said about it. Q10 no longer sends the employee to HR about the sofa, and the partial questions Q17 and Q19 still say what is missing.
+- `run_evals.py` takes ids (`python run_evals.py 10 17`) and `try_judge.py` takes case names (`python try_judge.py F B`, which also prints the full reason), to save tokens. Groq's free tier has a 200,000 tokens per day cap, and a full run uses about 100,000.
+
 Known weak spots:
-- The judge catches blatant mistakes (`try_judge.py` cases A to D) but can pass a softer one, such as stretching the lost/stolen rule to cover damage (case E).
+- The judge catches blatant mistakes (`try_judge.py` cases A to D) but can pass a softer one, such as stretching the lost/stolen rule to cover damage (case E), or a true but needless disclaimer (case F).
 - Answers vary slightly between runs even at temperature 0, so one run is a noisy measurement.
 - Seven held-out questions is a small sample.
 
