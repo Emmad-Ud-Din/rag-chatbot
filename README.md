@@ -72,13 +72,25 @@ Keeping the two apart tells you what to fix. Low hit rate means chunking or embe
 
 ### Status
 
-Last full run on the TypeScript version: retrieval 11/11, answer correctness 14/14. That score hides some problems. Reading the passing answers shows the bot sometimes makes false claims about what the whole handbook lacks, because it only sees the top 3 sections, and the judge cannot always catch them. The judge catches blatant cases but misses subtle ones.
+`data/evals.json` has 21 questions. Last full run on the TypeScript version (17 of these, before four older questions were restored): retrieval 14/14, answer correctness 17/17, with 2 answerable questions flagged for absence claims (both checked by hand, neither false). Seven of those 17 were written after the prompt was frozen and passed without any prompt changes, which is the evidence that the fixes are not just fitted to the original questions.
 
-This Python port has not been run against the live APIs yet. It was checked offline: every file compiles, and chunking, cosine similarity and retrieval ranking were tested with fake vectors.
+How it got there:
+- The judge first failed good answers because it never saw the handbook text, and demanded facts the question did not ask for. It now gets the retrieved sections, and also the full handbook as ground truth.
+- The bot kept denying the home office stipend (standing desk question) until a reminder was added right after the question in the user message. A rule plus an example in the system prompt alone did not fix it.
+- That reminder also had to say what to do for partial answers, otherwise the partial questions (Q7, Q12) lost the "what is not covered" part.
+- The bot volunteered false statements like "the handbook does not mention parental leave" because it only sees the top 3 sections. `run_evals.py` counts those phrases on answerable questions (about 7 before the reminder fix, 0 to 2 after).
+
+Known weak spots:
+- The judge catches blatant mistakes (`try_judge.py` cases A to D) but can pass a softer one, such as stretching the lost/stolen rule to cover damage (case E).
+- Answers vary slightly between runs even at temperature 0, so one run is a noisy measurement.
+- Seven held-out questions is a small sample.
+
+This Python port has not been run against the live APIs. It was checked offline: every file compiles, and chunking, cosine similarity, retrieval ranking, request shapes, the retry on 429, judge verdict parsing and the absence-claim pattern were tested with fake data.
 
 ## Next steps
 
 - Run `python ingest.py` and `python run_evals.py` and compare with the TypeScript results
-- Count unprompted "the handbook does not mention..." claims on answerable questions, and tighten the prompt until that number drops
+- Add more held-out questions, especially multi-section ones (list the needed sections instead of one)
+- Agent step: give the bot a tool (for example a leave-days calculator) with a cap on loop iterations
 - Streaming chat UI
 - Log the question, retrieved chunks and answer for every request

@@ -21,7 +21,10 @@ Rules:
 # thing they read, and the system prompt rule alone was not enough.
 REMINDER = (
     "Reminder: if any section mentions something related to the question, "
-    "tell the employee about it, even if it is unclear whether it applies."
+    "tell the employee about it, even if it is unclear whether it applies. "
+    "If the sections fully answer the question, answer it and stop, without adding "
+    "statements about what the handbook does not cover. If they answer only part of "
+    "it, give that part, then say clearly which part the handbook does not cover."
 )
 
 

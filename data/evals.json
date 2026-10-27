@@ -71,27 +71,76 @@
   },
   {
     "id": 11,
+    "question": "Do I have to change my password regularly?",
+    "reference": "No. Passwords are rotated only after a suspected breach, not on a fixed schedule. Extra details such as the 14-character minimum and mandatory multi-factor authentication are optional.",
+    "section": 11,
+    "type": "answerable"
+  },
+  {
+    "id": 12,
+    "question": "Can I give my password to IT if they ask for it?",
+    "reference": "No. Employees must never share credentials, including with colleagues or IT staff.",
+    "section": 11,
+    "type": "answerable"
+  },
+  {
+    "id": 13,
+    "question": "If a public holiday falls on a Saturday, do I get Monday off?",
+    "reference": "No. If a public holiday falls on a weekend, it is not moved to a weekday. The company observes 12 public holidays per year, which is optional detail.",
+    "section": 4,
+    "type": "answerable"
+  },
+  {
+    "id": 14,
+    "question": "Can I carry my unused learning budget into next year?",
+    "reference": "No. Unused learning budget does not roll over. The budget is 1,200 USD per year. Optionally, conference travel is covered separately under the travel policy.",
+    "section": 14,
+    "type": "answerable"
+  },
+  {
+    "id": 15,
+    "question": "How often are performance reviews?",
+    "reference": "Twice a year, in June and December. Optionally, each review covers the goals from the previous cycle and sets new ones, with written feedback from the manager.",
+    "section": 13,
+    "type": "answerable"
+  },
+  {
+    "id": 16,
+    "question": "Does the company offer a gym membership?",
+    "reference": "Should say the handbook does not cover gym memberships. Must not invent a benefit, and must not present the learning budget or the home office stipend as a gym benefit.",
+    "section": null,
+    "type": "unanswerable"
+  },
+  {
+    "id": 17,
+    "question": "What happens if I am sick for more than 10 days in a year?",
+    "reference": "Employees receive 10 paid sick days per year, and a doctor's note is required for absences longer than 3 consecutive days. The handbook does not say what happens after the 10 days are used. A good answer gives the 10 days and says that what follows is not covered.",
+    "section": 3,
+    "type": "partial"
+  },
+  {
+    "id": 18,
     "question": "What is the most I can spend on a hotel in Tokyo?",
     "reference": "Hotel stays are reimbursed up to 180 USD per night in standard cities and 250 USD per night in high-cost cities such as New York, London, and Tokyo.",
     "section": 7,
     "type": "answerable"
   },
   {
-    "id": 12,
+    "id": 19,
     "question": "Do I get free money for a standing desk?",
     "reference": "There is a one-time home office stipend of 500 USD, available within the first 90 days of employment. The handbook does not say what the stipend covers, so it cannot confirm that a standing desk qualifies. A good answer mentions the stipend and says it is unclear whether a standing desk is covered.",
     "section": 6,
     "type": "partial"
   },
   {
-    "id": 14,
+    "id": 20,
     "question": "Can I bring my dog to the office?",
     "reference": "The handbook does not cover this policy.",
     "section": null,
     "type": "unanswerable"
   },
   {
-    "id": 15,
+    "id": 21,
     "question": "I am traveling for work, what can I claim and how fast?",
     "reference": "Business travel must be booked through the company travel portal. Economy class is required for flights under 6 hours. For flights over 6 hours, premium economy is allowed. Hotel stays are reimbursed up to 180 USD per night in standard cities and 250 USD per night in high-cost cities such as New York, London, and Tokyo. During business travel, employees receive a daily meal allowance of 60 USD. This covers breakfast, lunch, and dinner. Alcohol is not reimbursable. Meals with clients can be claimed separately with an itemized receipt and the names of attendees. Expense claims must be submitted within 30 days of the expense. Claims over 100 USD require a receipt. Claims submitted after 30 days are rejected unless a manager approves an exception in writing. Reimbursement is paid with the next monthly payroll.",
     "section": 7,

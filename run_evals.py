@@ -5,6 +5,7 @@
 """
 
 import json
+import re
 import time
 from pathlib import Path
 
@@ -15,6 +16,16 @@ from rag.judge import judge
 # so wait between questions.
 PAUSE_SECONDS = 45
 
+# Flags sentences like "the handbook does not specify ...". The bot only sees the
+# top 3 sections, so a claim about what the whole handbook lacks can be false, and
+# the judge does not always catch it. The flag means "check by hand", not "wrong".
+# It allows one word between the negation and the verb ("does not specifically address").
+ABSENCE = re.compile(
+    r"(does not|doesn.t)( \w+)? "
+    r"(mention|specify|provide|state|cover|address|give|include|say)",
+    re.IGNORECASE,
+)
+
 
 def main() -> None:
     evals = json.loads(Path("data/evals.json").read_text(encoding="utf-8"))
@@ -22,6 +33,7 @@ def main() -> None:
     scorable = 0
     hits = 0
     passes = 0
+    absence_claims = 0
 
     for e in evals:
         result = answer(e["question"])
@@ -52,10 +64,17 @@ def main() -> None:
         print("   answer:", result["answer"])
         print("   judge:", verdict.reason)
 
+        # Only answerable questions: for partial and unanswerable ones, saying what
+        # the handbook does not cover is the correct behavior.
+        if e["type"] == "answerable" and ABSENCE.search(result["answer"]):
+            absence_claims += 1
+            print("   ABSENCE CLAIM, check by hand")
+
         time.sleep(PAUSE_SECONDS)
 
     print(f"\nRetrieval hit rate: {hits}/{scorable}")
     print(f"Answer correctness: {passes}/{len(evals)}")
+    print(f"Answerable questions with absence claims: {absence_claims}")
 
 
 if __name__ == "__main__":

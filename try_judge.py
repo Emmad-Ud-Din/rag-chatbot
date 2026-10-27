@@ -1,6 +1,13 @@
-"""Sanity check for the judge: three answers where the right verdict is known.
+"""Sanity check for the judge: answers where the right verdict is known.
 
-Expected: A FAIL (missing the 25-day rule), B PASS, C FAIL (invented rule).
+Expected:
+  A FAIL  missing the 25-day rule
+  B PASS  the good laptop answer
+  C FAIL  invented a rule (blatant)
+  D FAIL  false claim that the handbook does not mention other leave types
+  E       a softer version of C (stretches the lost/stolen rule to damage).
+          This is a known weak spot: the judge may wrongly PASS it. If it does,
+          the judge prompt needs work before a Q8 result can be trusted.
 """
 
 from rag.judge import judge
@@ -18,7 +25,17 @@ Q3 = {
     "question": "How many days can I take off?",
     "reference": (
         "20 days of paid annual leave per year, increasing to 25 after five years of "
-        "service. Sick leave (10 days) and public holidays (12 days) are separate."
+        "service. The question is ambiguous, so a good answer may also mention sick "
+        "leave (10 days) and public holidays (12 days), but these are optional."
+    ),
+    "type": "answerable",
+}
+
+Q4 = {
+    "question": "Are my leaves carried forward if unused?",
+    "reference": (
+        "Up to 5 unused annual leave days carry over to the next year and expire on "
+        "March 31. Sick days do not carry over."
     ),
     "type": "answerable",
 }
@@ -41,6 +58,20 @@ CASES = [
         "equipment. Please ask HR or your manager.",
     ),
     ("C", Q8, "If your laptop is damaged, report it to IT within 24 hours."),
+    (
+        "D",
+        Q4,
+        "Up to 5 unused annual leave days carry over and expire on March 31. Sick days "
+        "do not carry over. The handbook does not mention any other types of leave, so "
+        "check with HR for other categories.",
+    ),
+    (
+        "E",
+        Q8,
+        "The handbook does not specifically mention damage, but the policy requires "
+        "reporting lost or stolen equipment to IT within 24 hours, so reporting damage "
+        "to IT follows the same principle.",
+    ),
 ]
 
 
