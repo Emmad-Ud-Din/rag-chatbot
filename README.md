@@ -92,9 +92,17 @@ Fifth run: 20/21. Q10 ("can I work from my sofa every day?") failed once and pas
 - The reminder in `answer.ts` now says a detail only counts as an uncovered part if the answer would be different depending on what the handbook said about it. Q10 no longer sends the employee to HR about the sofa, and the partial questions Q17 and Q19 still say what is missing.
 - `run-evals.ts` takes ids (`run-evals.ts 10 17`) and `try-judge.ts` takes case names (`try-judge.ts F B`, which also prints the full reason), to save tokens. Groq's free tier has a 200,000 tokens per day cap, and a full run uses about 100,000.
 
+Sixth run (full): 19/21. Q2 and Q7 failed, and reading them showed the bot dropped important details:
+- Q2 said "approved overtime" but not that approval must come before the overtime is worked. The judge had passed the same answer word for word earlier, so its reference now says the advance approval is required. A new system prompt rule tells the bot to state conditions (approvals, deadlines, documents, eligibility) exactly, including when they must happen. Q2 then passed 3/3 with "approved in advance by a manager". Case H in `try-judge` checks that the old answer now fails.
+- Q7 said "there is no separate maternal leave", treating the gap as a naming issue. The real gap is that parental leave starts at the birth, so leave during pregnancy is not covered. Its reference now requires saying so explicitly. A system prompt rule tells the bot to compare the employee's situation with what the policy covers (who, when it starts and ends), not words with words. Results by hand: no rule 0/3, rule in the system prompt 3/6, rule also in the reminder 0/3 (reverted). Q7 passes about half the time.
+- Side-effect checks after these rules: Q5 and Q21 kept their conditions without padding, Q17 and Q19 kept their real gaps, and Q10 was clean in two runs ("including from your sofa", no disclaimer).
+- The judge sometimes returned empty text: `gpt-oss` spends `max_tokens` on thinking first. The judge now has `max_tokens: 3000` and throws an error on an empty reply instead of counting it as a FAIL.
+
 Known weak spots:
+- Q7 (pregnancy) passes about half the time. A likely fix is to have the bot write the employee's situation and what the policy covers before answering, as the judge does with its check lines, and hide those notes from the employee.
 - The judge may pass a soft borrowed rule (case E in `npm run judge:test`: "reporting damage to IT follows the same principle"). Run `try-judge` after any judge prompt change.
-- Answers vary slightly between runs even at `temperature: 0`.
+- Both the bot and the judge vary between runs even at `temperature: 0`. On borderline questions, compare totals over several runs, not one batch of three, and read the answers.
+- A judge checking meaning can miss small changes in wording, for example "flights under 6 hours" becoming "≤ 6 hours".
 - Questions that need several sections are only checked against one section.
 
 ## Next steps

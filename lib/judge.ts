@@ -51,7 +51,10 @@ export async function judge(
     },
     body: JSON.stringify({
       model: "openai/gpt-oss-120b",
-      max_tokens: 1500,
+      // gpt-oss thinks before answering and thinking uses this budget. The judge
+      // prompt is long (full handbook, check lines), so 1500 sometimes left no
+      // room for the reply.
+      max_tokens: 3000,
       // 0 = same input gives the same verdict, so runs are comparable.
       temperature: 0,
       messages: [
@@ -76,7 +79,15 @@ export async function judge(
   }
 
   const json = await res.json();
-  const text = json.choices[0].message.content as string;
+  const choice = json.choices[0];
+  const text = (choice.message.content ?? "") as string;
+  // Thinking models spend max_tokens on reasoning first. If it runs out,
+  // the reply is empty. Fail loudly instead of counting it as a FAIL.
+  if (!text.trim()) {
+    throw new Error(
+      `Judge returned no text (finish_reason: ${choice.finish_reason}). Raise max_tokens.`
+    );
+  }
   // The model judges each sentence; code combines the checks so a failed check
   // can't be ignored (case F once had "matters: no" with VERDICT: CORRECT).
   // Only "true: no" is enforced. "matters" flipped between runs on the same

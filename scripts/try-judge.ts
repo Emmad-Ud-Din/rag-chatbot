@@ -12,6 +12,7 @@ import { judge } from "../lib/judge";
 //   F FAIL  true but needless disclaimer (sofa does not change the remote work answer).
 //           Known weak spot: "matters" is not enforced in code, so the judge may PASS it.
 //   G PASS  the same answer as F without the disclaimer
+//   H FAIL  old Q2 answer: says "approved overtime" but not that approval must come in advance
 //
 // Run all:       npx.cmd tsx --env-file=.env.local scripts/try-judge.ts
 // Run some only: npx.cmd tsx --env-file=.env.local scripts/try-judge.ts F B
@@ -45,6 +46,13 @@ const q10 = {
   question: "Can I work from my sofa every day?",
   reference:
     "Remote work is allowed up to 3 days per week. Fully remote (5 days) needs department head approval and is reviewed every 6 months.",
+  type: "answerable",
+};
+
+const q2 = {
+  question: "Is overtime paid for?",
+  reference:
+    'Overtime is not paid as money. It is compensated with time off in lieu, taken within 60 days, and only if a manager approved it in advance. The answer must say that approval is needed before the overtime is worked. Saying only "approved overtime" is not enough.',
   type: "answerable",
 };
 
@@ -85,6 +93,12 @@ async function main() {
       item: q10,
       answer:
         "You can work remotely up to 3 days per week. Fully remote, all 5 days, needs department head approval and is reviewed every 6 months.",
+    },
+    {
+      name: "H",
+      item: q2,
+      answer:
+        "Overtime isn't paid in cash; approved overtime is compensated with time-off-in-lieu, which must be taken within 60 days.",
     },
   ];
 
