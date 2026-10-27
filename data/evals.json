@@ -9,7 +9,7 @@
   {
     "id": 2,
     "question": "Is overtime paid for?",
-    "reference": "Approved overtime is compensated with time off in lieu, taken within 60 days. It must be approved by a manager in advance. It is not paid as money.",
+    "reference": "Overtime is not paid as money. It is compensated with time off in lieu, taken within 60 days, and only if a manager approved it in advance. The answer must say that approval is needed before the overtime is worked. Saying only \"approved overtime\" is not enough.",
     "section": 1,
     "type": "answerable"
   },
@@ -44,7 +44,7 @@
   {
     "id": 7,
     "question": "Is there any maternal leave in case of pregnancy?",
-    "reference": "Primary caregivers get 16 weeks of paid parental leave, which must begin within 6 months of the birth or adoption. The handbook says nothing about leave before the birth. A good answer gives the 16 weeks and says that pre-birth leave is not covered.",
+    "reference": "Primary caregivers get 16 weeks of paid parental leave, which must begin within 6 months of the birth or adoption. The handbook says nothing about leave during pregnancy, before the birth. The answer must give the 16 weeks AND say explicitly that leave before the birth is not covered. Saying only that there is no separate maternal leave policy is not enough.",
     "section": 5,
     "type": "partial"
   },

@@ -69,7 +69,10 @@ def judge(item: dict, answer: str, sources: str) -> Verdict:
         headers={"Authorization": f"Bearer {os.environ['GROQ_API_KEY']}"},
         json={
             "model": MODEL,
-            "max_tokens": 1500,
+            # gpt-oss thinks before answering and thinking uses this budget. The judge
+            # prompt is long (full handbook, check lines), so 1500 sometimes left no
+            # room for the reply.
+            "max_tokens": 3000,
             # 0 = same input gives the same verdict, so runs are comparable.
             "temperature": 0,
             "messages": [
@@ -92,7 +95,15 @@ def judge(item: dict, answer: str, sources: str) -> Verdict:
     if not res.ok:
         raise RuntimeError(f"Judge failed: {res.status_code} {res.text}")
 
-    text = res.json()["choices"][0]["message"]["content"]
+    choice = res.json()["choices"][0]
+    text = choice["message"].get("content") or ""
+    # Thinking models spend max_tokens on reasoning first. If it runs out,
+    # the reply is empty. Fail loudly instead of counting it as a FAIL.
+    if not text.strip():
+        raise RuntimeError(
+            f"Judge returned no text (finish_reason: {choice.get('finish_reason')}). "
+            "Raise max_tokens."
+        )
     # The model judges each sentence; code combines the checks so a failed check
     # can't be ignored (case F once had "matters: no" with VERDICT: CORRECT).
     # Only "true: no" is enforced. "matters" flipped between runs on the same

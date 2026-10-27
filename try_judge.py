@@ -10,6 +10,7 @@ Expected:
   F FAIL  true but needless disclaimer (sofa does not change the remote work answer).
           Known weak spot: "matters" is not enforced in code, so the judge may PASS it.
   G PASS  the same answer as F without the disclaimer
+  H FAIL  old Q2 answer: says "approved overtime" but not that approval must come in advance
 
 Run all:       python try_judge.py
 Run some only: python try_judge.py F B
@@ -66,6 +67,17 @@ Q10 = {
     "type": "answerable",
 }
 
+Q2 = {
+    "question": "Is overtime paid for?",
+    "reference": (
+        "Overtime is not paid as money. It is compensated with time off in lieu, taken "
+        "within 60 days, and only if a manager approved it in advance. The answer must "
+        "say that approval is needed before the overtime is worked. Saying only "
+        '"approved overtime" is not enough.'
+    ),
+    "type": "answerable",
+}
+
 CASES = [
     ("A", Q3, "You get 20 days of paid annual leave per year."),
     (
@@ -101,6 +113,12 @@ CASES = [
         Q10,
         "You can work remotely up to 3 days per week. Fully remote, all 5 days, needs "
         "department head approval and is reviewed every 6 months.",
+    ),
+    (
+        "H",
+        Q2,
+        "Overtime isn't paid in cash; approved overtime is compensated with "
+        "time-off-in-lieu, which must be taken within 60 days.",
     ),
 ]
 

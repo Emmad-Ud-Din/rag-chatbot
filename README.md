@@ -86,9 +86,16 @@ Latest TypeScript run: 20/21. Q10 ("can I work from my sofa every day?") failed 
 - The reminder in `rag/answer.py` now says a detail only counts as an uncovered part if the answer would be different depending on what the handbook said about it. Q10 no longer sends the employee to HR about the sofa, and the partial questions Q17 and Q19 still say what is missing.
 - `run_evals.py` takes ids (`python run_evals.py 10 17`) and `try_judge.py` takes case names (`python try_judge.py F B`, which also prints the full reason), to save tokens. Groq's free tier has a 200,000 tokens per day cap, and a full run uses about 100,000.
 
+Next full TypeScript run: 19/21. Q2 and Q7 failed, and reading them showed the bot dropped important details. Changes, ported here too:
+- Q2 said "approved overtime" but not that approval must come before the overtime is worked. Its reference now says the advance approval is required, and a system prompt rule tells the bot to state conditions (approvals, deadlines, documents, eligibility) exactly, including when they must happen. Q2 then passed 3/3. Case H in `try_judge.py` checks that the old answer now fails.
+- Q7 said "there is no separate maternal leave", treating the gap as a naming issue. The real gap is that parental leave starts at the birth, so leave during pregnancy is not covered. Its reference now requires saying so, and a system prompt rule tells the bot to compare the employee's situation with what the policy covers (who, when it starts and ends), not words with words. By hand: no rule 0/3, rule in the system prompt 3/6, rule also in the reminder 0/3 (reverted).
+- Side-effect checks: Q5 and Q21 kept their conditions without padding, Q17 and Q19 kept their real gaps, Q10 was clean in two runs.
+- The judge sometimes returned empty text, because `gpt-oss` spends `max_tokens` on thinking first. It now has `max_tokens: 3000` and raises an error on an empty reply instead of counting it as a FAIL.
+
 Known weak spots:
+- Q7 (pregnancy) passes about half the time. A likely fix is to have the bot write the employee's situation and what the policy covers before answering, as the judge does with its check lines, and hide those notes from the employee.
 - The judge catches blatant mistakes (`try_judge.py` cases A to D) but can pass a softer one, such as stretching the lost/stolen rule to cover damage (case E), or a true but needless disclaimer (case F).
-- Answers vary slightly between runs even at temperature 0, so one run is a noisy measurement.
+- Both the bot and the judge vary between runs even at temperature 0. On borderline questions, compare totals over several runs and read the answers.
 - Seven held-out questions is a small sample.
 
 This Python port has not been run against the live APIs. It was checked offline: every file compiles, and chunking, cosine similarity, retrieval ranking, request shapes, the retry on 429, judge verdict parsing and the absence-claim pattern were tested with fake data.
