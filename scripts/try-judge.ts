@@ -9,7 +9,8 @@ import { judge } from "../lib/judge";
 //   D FAIL  false claim that the handbook does not mention other leave types
 //   E FAIL  a softer version of C (stretches the lost/stolen rule to damage).
 //           Known weak spot: the judge has passed it before.
-//   F FAIL  true but needless disclaimer (sofa does not change the remote work answer)
+//   F FAIL  true but needless disclaimer (sofa does not change the remote work answer).
+//           Known weak spot: "matters" is not enforced in code, so the judge may PASS it.
 //   G PASS  the same answer as F without the disclaimer
 //
 // Run all:       npx.cmd tsx --env-file=.env.local scripts/try-judge.ts
