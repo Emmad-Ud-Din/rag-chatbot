@@ -32,7 +32,7 @@ export async function answer(question: string) {
           role: "user",
           // The reminder sits next to the question on purpose: models weight the
           // last thing they read, and the system prompt rule alone was not enough.
-          content: `Handbook sections:\n\n${context}\n\nQuestion: ${question}\n\nReminder: if any section mentions something related to the question, tell the employee about it, even if it is unclear whether it applies. If the sections fully answer the question, answer it and stop, without adding statements about what the handbook does not cover. If they answer only part of it, give that part, then say clearly which part the handbook does not cover.`,
+          content: `Handbook sections:\n\n${context}\n\nQuestion: ${question}\n\nReminder: if any section mentions something related to the question, tell the employee about it, even if it is unclear whether it applies. If the sections fully answer the question, answer it and stop, without adding statements about what the handbook does not cover. A detail in the question only counts as a part the handbook does not cover if the answer would be different depending on what the handbook said about it. If they answer only part of it, give that part, then say clearly which part the handbook does not cover.`,
         },
       ],
     }),

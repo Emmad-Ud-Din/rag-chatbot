@@ -86,6 +86,12 @@ Fourth run, with 7 held-out questions (Q11 to Q17, written after the prompt was 
 
 `data/evals.json` now has 21 questions: the original 10, the 7 held-out ones, and 4 more (Tokyo hotel, standing desk, dog, travel claim).
 
+Fifth run: 20/21. Q10 ("can I work from my sofa every day?") failed once and passed twice on re-runs. The bot gave the right rule every time but added "the handbook does not say whether working from a sofa is allowed, ask HR", which is true but puts doubt on something the rule already answers. Changes:
+- The judge now writes a check line for every "the handbook does not ..." sentence (`true: yes/no`, `matters: yes/no`), and code combines them into the verdict. Before this, the judge once wrote `matters: no` and still said CORRECT.
+- Only `true: no` fails an answer. `matters` flipped between runs on the same input, so it is printed for reading but not enforced. Needless disclaimers are caught by the ABSENCE flag and a human look instead.
+- The reminder in `answer.ts` now says a detail only counts as an uncovered part if the answer would be different depending on what the handbook said about it. Q10 no longer sends the employee to HR about the sofa, and the partial questions Q17 and Q19 still say what is missing.
+- `run-evals.ts` takes ids (`run-evals.ts 10 17`) and `try-judge.ts` takes case names (`try-judge.ts F B`, which also prints the full reason), to save tokens. Groq's free tier has a 200,000 tokens per day cap, and a full run uses about 100,000.
+
 Known weak spots:
 - The judge may pass a soft borrowed rule (case E in `npm run judge:test`: "reporting damage to IT follows the same principle"). Run `try-judge` after any judge prompt change.
 - Answers vary slightly between runs even at `temperature: 0`.

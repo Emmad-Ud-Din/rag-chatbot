@@ -26,12 +26,24 @@ async function main() {
     fs.readFileSync("data/evals.json", "utf-8")
   );
 
+  // Optional: run only some ids, e.g. `npx.cmd tsx --env-file=.env.local scripts/run-evals.ts 10 8`.
+  // With no ids, all questions run. Saves tokens when checking one question.
+  const only = process.argv.slice(2).map(Number);
+  const selected = only.length
+    ? evals.filter((e) => only.includes(e.id))
+    : evals;
+
+  if (selected.length === 0) {
+    console.log("No questions match those ids.");
+    return;
+  }
+
   let scorable = 0;
   let hits = 0;
   let passes = 0;
   let absenceClaims = 0;
 
-  for (const e of evals) {
+  for (const [i, e] of selected.entries()) {
     const result = await answer(e.question);
     const sections = result.chunks.map((c) => c.section);
 
@@ -68,11 +80,14 @@ async function main() {
       console.log("   ABSENCE CLAIM, check by hand");
     }
 
-    await new Promise((r) => setTimeout(r, PAUSE_MS));
+    // No point waiting after the last question.
+    if (i < selected.length - 1) {
+      await new Promise((r) => setTimeout(r, PAUSE_MS));
+    }
   }
 
   console.log(`\nRetrieval hit rate: ${hits}/${scorable}`);
-  console.log(`Answer correctness: ${passes}/${evals.length}`);
+  console.log(`Answer correctness: ${passes}/${selected.length}`);
   console.log(`Answerable questions with absence claims: ${absenceClaims}`);
 }
 

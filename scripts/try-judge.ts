@@ -4,12 +4,17 @@ import { judge } from "../lib/judge";
 //
 // Expected:
 //   A FAIL  missing the 25-day rule
-//   B PASS  the good laptop answer
+//   B PASS  the good laptop answer (a disclaimer that matters, since damage is not covered)
 //   C FAIL  invented a rule (blatant)
 //   D FAIL  false claim that the handbook does not mention other leave types
-//   E       a softer version of C (stretches the lost/stolen rule to damage).
-//           This is a known weak spot: the judge may wrongly PASS it. If it does,
-//           the judge prompt needs work before a Q8 result can be trusted.
+//   E FAIL  a softer version of C (stretches the lost/stolen rule to damage).
+//           Known weak spot: the judge has passed it before.
+//   F FAIL  true but needless disclaimer (sofa does not change the remote work answer)
+//   G PASS  the same answer as F without the disclaimer
+//
+// Run all:       npx.cmd tsx --env-file=.env.local scripts/try-judge.ts
+// Run some only: npx.cmd tsx --env-file=.env.local scripts/try-judge.ts F B
+// Running only some cases also prints the judge's full reason.
 
 const sources =
   "## 2. Annual Leave Entitlement\n\nFull-time employees receive 20 days of paid annual leave per calendar year. This increases to 25 days after five years of service.\n\n---\n\n## 10. Laptop and Equipment Policy\n\nEvery new employee receives a company laptop. Laptops are replaced every 3 years. Lost or stolen equipment must be reported to IT within 24 hours.";
@@ -35,6 +40,13 @@ const q8 = {
   type: "unanswerable",
 };
 
+const q10 = {
+  question: "Can I work from my sofa every day?",
+  reference:
+    "Remote work is allowed up to 3 days per week. Fully remote (5 days) needs department head approval and is reviewed every 6 months.",
+  type: "answerable",
+};
+
 async function main() {
   const cases = [
     { name: "A", item: q3, answer: "You get 20 days of paid annual leave per year." },
@@ -42,7 +54,7 @@ async function main() {
       name: "B",
       item: q8,
       answer:
-        "The handbook does not address damaged laptops. It only covers lost or stolen equipment. Please ask HR or your manager.",
+        "The handbook does not address damaged laptops. For equipment problems, it only covers lost or stolen equipment. Please ask HR or your manager.",
     },
     {
       name: "C",
@@ -61,11 +73,33 @@ async function main() {
       answer:
         "The handbook does not specifically mention damage, but the policy requires reporting lost or stolen equipment to IT within 24 hours, so reporting damage to IT follows the same principle.",
     },
+    {
+      name: "F",
+      item: q10,
+      answer:
+        "You can work remotely up to 3 days per week. Fully remote needs department head approval and is reviewed every 6 months. The handbook does not say whether working from a sofa specifically is allowed; confirm with HR or your manager.",
+    },
+    {
+      name: "G",
+      item: q10,
+      answer:
+        "You can work remotely up to 3 days per week. Fully remote, all 5 days, needs department head approval and is reviewed every 6 months.",
+    },
   ];
 
-  for (const c of cases) {
+  // Optional: run only some cases by name. Shows the full reason.
+  const only = process.argv.slice(2);
+  const selected = only.length ? cases.filter((c) => only.includes(c.name)) : cases;
+
+  if (selected.length === 0) {
+    console.log("No cases match those names.");
+    return;
+  }
+
+  for (const c of selected) {
     const v = await judge(c.item, c.answer, sources);
-    console.log(c.name, v.pass ? "PASS" : "FAIL", "|", v.reason.slice(0, 150));
+    const reason = only.length ? v.reason : v.reason.slice(0, 150);
+    console.log(c.name, v.pass ? "PASS" : "FAIL", "|", reason);
   }
 }
 
