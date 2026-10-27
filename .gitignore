@@ -6,3 +6,4 @@ __pycache__/
 venv/
 *.log
 data/index.json
+node_modules/
