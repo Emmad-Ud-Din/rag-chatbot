@@ -6,6 +6,7 @@ retried. A long wait (the daily token cap says "try again in 2m23s") is not wort
 making someone stare at a spinner for, so it fails fast instead.
 """
 
+import json
 import math
 import os
 import re
@@ -48,8 +49,10 @@ def _wait_from_response(res: requests.Response) -> float | None:
     return None
 
 
-def call_groq(body: dict, sleep=time.sleep) -> dict:
-    """`sleep` is a parameter so tests can skip the real waiting."""
+def _post_with_retries(body: dict, sleep=time.sleep, stream: bool = False) -> requests.Response:
+    """Send the request and retry temporary errors. Returns the response once it
+    is OK, so call_groq can read it whole and stream_groq piece by piece.
+    `sleep` is a parameter so tests can skip the real waiting."""
     attempt = 0
     while True:
         res = requests.post(
@@ -57,9 +60,10 @@ def call_groq(body: dict, sleep=time.sleep) -> dict:
             headers={"Authorization": f"Bearer {os.environ['GROQ_API_KEY']}"},
             json=body,
             timeout=120,
+            stream=stream,
         )
         if res.ok:
-            return res.json()
+            return res
 
         temporary = res.status_code == 429 or res.status_code >= 500
         # Use Groq's own wait if it gave one, otherwise back off: 1s, then 2s.
@@ -72,6 +76,33 @@ def call_groq(body: dict, sleep=time.sleep) -> dict:
         print(f"Groq {res.status_code}, retrying in {round(wait)}s", file=sys.stderr)
         sleep(wait)
         attempt += 1
+
+
+def call_groq(body: dict, sleep=time.sleep) -> dict:
+    """The whole reply at once. Used by the judge, which has nobody waiting on it."""
+    return _post_with_retries(body, sleep).json()
+
+
+def stream_groq(body: dict, sleep=time.sleep):
+    """The reply in pieces, as the model writes it. Groq sends Server-Sent Events:
+    lines like `data: {...}`, ending with `data: [DONE]`. Each yielded value is one
+    parsed chunk, with the new text in `choices[0]["delta"]`.
+
+    Retries only happen before the stream starts. Once text is on the employee's
+    screen, a failure can't be retried silently, so it is raised instead.
+    """
+    res = _post_with_retries({**body, "stream": True}, sleep, stream=True)
+    with res:
+        # iter_lines keeps an unfinished line until the rest arrives, so a
+        # `data:` line split across two network reads still comes out whole.
+        for raw in res.iter_lines(decode_unicode=False):
+            line = raw.decode("utf-8").strip()
+            if not line.startswith("data:"):
+                continue  # blank lines and comments
+            data = line[5:].strip()
+            if data == "[DONE]":
+                return
+            yield json.loads(data)
 
 
 def friendly_error(err: Exception) -> str:

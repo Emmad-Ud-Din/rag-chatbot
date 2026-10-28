@@ -2,7 +2,7 @@ import json
 import time
 from datetime import datetime, timezone
 
-from .groq import call_groq
+from .groq import stream_groq
 from .log import log_request, prompt_version
 from .retrieve import retrieve
 from .tools import LEAVE_TOOL, TOOLS
@@ -46,12 +46,20 @@ MAX_STEPS = 3
 PROMPT_VERSION = prompt_version(SYSTEM_PROMPT, REMINDER, json.dumps(LEAVE_TOOL))
 
 
-def answer(question: str) -> dict:
-    """Retrieve the top sections, ask the LLM (which may call tools), and return
-    the answer, the chunks used and every tool call the model made.
+# What the employee sees while a tool runs, so they know what is happening.
+TOOL_STATUS = {"calculate_leave": "Checking your leave balance..."}
+
+
+def answer_stream(question: str):
+    """Yield events as the request goes, in order:
+
+        {"type": "status", "text": ...}   a short note while retrieval or a tool runs
+        {"type": "text", "delta": ...}    the next piece of the answer, to add to what is shown
+        {"type": "done", "result": ...}   answer, chunks and tool calls, for logs and evals
 
     Every request is logged, including ones that fail halfway (a 429 on step 2,
-    say): the log entry is filled in as the request goes and written in `finally`.
+    say): the log entry is filled in as the request goes and written in `finally`,
+    which also runs if the caller stops reading early.
     """
     started = time.monotonic()
     # Every tool call the model made, with its result, for evals and the log.
@@ -63,8 +71,10 @@ def answer(question: str) -> dict:
         "toolCalls": tool_calls,
     }
     tokens = 0
+    first_text_ms = None
 
     try:
+        yield {"type": "status", "text": "Looking up the handbook..."}
         chunks = retrieve(question)
         log["sections"] = [{"section": c["section"], "score": round(c["score"], 3)} for c in chunks]
         context = "\n\n---\n\n".join(c["text"] for c in chunks)
@@ -79,9 +89,15 @@ def answer(question: str) -> dict:
         ]
 
         for _ in range(MAX_STEPS):
-            # call_groq retries short rate limits and server errors, and raises an
-            # ApiError for everything else (logged below, shown nicely by the caller).
-            data = call_groq(
+            # What this step's stream adds up to. Text is passed on as it arrives.
+            # Tool calls arrive in pieces too (the arguments as fragments of a JSON
+            # string), so they are collected and only parsed once the step is over.
+            content = ""
+            pending: dict[int, dict] = {}
+
+            # stream_groq retries short rate limits before the stream starts, and
+            # raises an ApiError for everything else (logged below, shown nicely by the caller).
+            for chunk in stream_groq(
                 {
                     "model": MODEL,
                     # gpt-oss models think before answering, and thinking uses this budget.
@@ -91,24 +107,61 @@ def answer(question: str) -> dict:
                     "messages": messages,
                     "tools": [LEAVE_TOOL],  # tells the model the tool exists
                 }
-            )
-            tokens += (data.get("usage") or {}).get("total_tokens", 0)
-            msg = data["choices"][0]["message"]
+            ):
+                # Groq puts the token count on the last chunk, under x_groq.
+                usage = chunk.get("usage") or (chunk.get("x_groq") or {}).get("usage")
+                if usage:
+                    tokens += usage.get("total_tokens", 0)
+
+                choices = chunk.get("choices") or []
+                delta = choices[0].get("delta") if choices else None
+                if not delta:
+                    continue
+
+                if delta.get("content"):
+                    content += delta["content"]
+                    if first_text_ms is None:
+                        first_text_ms = round((time.monotonic() - started) * 1000)
+                    yield {"type": "text", "delta": delta["content"]}
+
+                for piece in delta.get("tool_calls") or []:
+                    # `index` says which tool call this piece belongs to; the first
+                    # piece of each call carries its id and name.
+                    call = pending.setdefault(piece["index"], {"id": "", "name": "", "args": ""})
+                    if piece.get("id"):
+                        call["id"] = piece["id"]
+                    fn = piece.get("function") or {}
+                    call["name"] += fn.get("name") or ""
+                    call["args"] += fn.get("arguments") or ""
 
             # No tool call means the model has written its answer.
-            if not msg.get("tool_calls"):
-                log["answer"] = msg["content"]
-                return {"answer": msg["content"], "chunks": chunks, "tool_calls": tool_calls}
+            if not pending:
+                log["answer"] = content
+                yield {"type": "done", "result": {"answer": content, "chunks": chunks, "tool_calls": tool_calls}}
+                return
 
             # The model wants a tool. Record its request, run the tool, and add the
             # result to the conversation so the next call can see it.
-            messages.append({"role": "assistant", "content": msg.get("content") or "", "tool_calls": msg["tool_calls"]})
+            calls = [pending[i] for i in sorted(pending)]
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": content,
+                    "tool_calls": [
+                        {"id": c["id"], "type": "function", "function": {"name": c["name"], "arguments": c["args"]}}
+                        for c in calls
+                    ],
+                }
+            )
 
-            for call in msg["tool_calls"]:
-                name = call["function"]["name"]
-                print("tool call:", name, call["function"]["arguments"])
+            for call in calls:
+                name = call["name"]
+                print("tool call:", name, call["args"])
+                yield {"type": "status", "text": TOOL_STATUS.get(name, "Working on it...")}
+
+                # Now the arguments string is complete, so it can be parsed.
                 try:
-                    args = json.loads(call["function"]["arguments"])
+                    args = json.loads(call["args"])
                 except json.JSONDecodeError:
                     args = None
 
@@ -126,17 +179,24 @@ def answer(question: str) -> dict:
                 messages.append({"role": "tool", "tool_call_id": call["id"], "content": json.dumps(result)})
 
         # The cap was reached without an answer.
+        fallback = "Sorry, I could not work that out. Please ask HR or your manager."
         log["answer"] = None
         log["stepCapReached"] = True
-        return {
-            "answer": "Sorry, I could not work that out. Please ask HR or your manager.",
-            "chunks": chunks,
-            "tool_calls": tool_calls,
-        }
+        yield {"type": "text", "delta": fallback}
+        yield {"type": "done", "result": {"answer": fallback, "chunks": chunks, "tool_calls": tool_calls}}
     except Exception as e:
         log["error"] = str(e)
         raise  # still fail the request, but only after recording why
     finally:
         log["ms"] = round((time.monotonic() - started) * 1000)
+        log["firstTextMs"] = first_text_ms  # time to first token, as the employee feels it
         log["tokens"] = tokens
         log_request(log)
+
+
+def answer(question: str) -> dict:
+    """The whole answer at once, for evals and scripts that don't stream."""
+    for event in answer_stream(question):
+        if event["type"] == "done":
+            return event["result"]
+    raise RuntimeError("answer_stream ended without a done event")

@@ -7,7 +7,7 @@
 import argparse
 import sys
 
-from rag.answer import answer
+from rag.answer import answer_stream
 from rag.groq import friendly_error
 from rag.retrieve import retrieve
 
@@ -31,15 +31,21 @@ def main() -> None:
             print(r["section"], f"{r['score']:.3f}")
         return
 
+    # Print the answer as it streams: status lines in grey, then the text piece by piece.
     try:
-        result = answer(args.question)
+        for event in answer_stream(args.question):
+            if event["type"] == "status":
+                print(f"\x1b[90m{event['text']}\x1b[0m")
+            elif event["type"] == "text":
+                # flush, or Python holds the pieces back until a newline.
+                print(event["delta"], end="", flush=True)
+            elif event["type"] == "done":
+                print()
+                print("sections:", [c["section"] for c in event["result"]["chunks"]])
     except Exception as e:
         # What the employee would see, then the real error for you.
         print(friendly_error(e))
         print(e, file=sys.stderr)
-        return
-    print("sections:", [c["section"] for c in result["chunks"]])
-    print(result["answer"])
 
 
 if __name__ == "__main__":
