@@ -10,7 +10,9 @@
     "judge:test": "tsx --env-file=.env.local scripts/try-judge.ts",
     "models": "tsx --env-file=.env.local scripts/list-models.ts",
     "evals": "tsx --env-file=.env.local scripts/run-evals.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:tools": "tsx scripts/test-tools.ts",
+    "evals:tools": "tsx --env-file=.env.local scripts/run-tool-evals.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
