@@ -51,6 +51,7 @@ lib/
   answer.ts        chunks + question -> LLM (with tool loop) -> answer
   tools.ts         leave calculator and its schema for the model
   log.ts           one JSON line per request in logs/YYYY-MM-DD.jsonl, kept 30 days (not committed)
+  groq.ts          calls Groq with retries on short rate limits and server errors
   judge.ts         LLM-as-judge for grading answers
 scripts/
   ingest.ts        build data/index.json

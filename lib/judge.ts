@@ -1,4 +1,5 @@
 import fs from "fs";
+import { callGroq } from "./groq";
 
 // The whole handbook, given to the judge as ground truth. The bot only sees the
 // top 3 sections, so without this the judge cannot tell a true extra detail from
@@ -43,42 +44,28 @@ export async function judge(
   answer: string,
   sources: string
 ) {
-  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: "openai/gpt-oss-120b",
-      // gpt-oss thinks before answering and thinking uses this budget. The judge
-      // prompt is long (full handbook, check lines), so 1500 sometimes left no
-      // room for the reply.
-      max_tokens: 3000,
-      // 0 = same input gives the same verdict, so runs are comparable.
-      temperature: 0,
-      messages: [
-        { role: "system", content: JUDGE_PROMPT },
-        {
-          role: "user",
-          content:
-            `Question: ${item.question}\n` +
-            `Question type: ${item.type}\n` +
-            `Reference: ${item.reference}\n` +
-            `Handbook sections the system retrieved:\n${sources}\n\n` +
-            `Full handbook (ground truth):\n${HANDBOOK}\n\n` +
-            `System answer: ${answer}`,
-        },
-      ],
-    }),
+  const json = await callGroq({
+    model: "openai/gpt-oss-120b",
+    // gpt-oss thinks before answering and thinking uses this budget. The judge
+    // prompt is long (full handbook, check lines), so 1500 sometimes left no
+    // room for the reply.
+    max_tokens: 3000,
+    // 0 = same input gives the same verdict, so runs are comparable.
+    temperature: 0,
+    messages: [
+      { role: "system", content: JUDGE_PROMPT },
+      {
+        role: "user",
+        content:
+          `Question: ${item.question}\n` +
+          `Question type: ${item.type}\n` +
+          `Reference: ${item.reference}\n` +
+          `Handbook sections the system retrieved:\n${sources}\n\n` +
+          `Full handbook (ground truth):\n${HANDBOOK}\n\n` +
+          `System answer: ${answer}`,
+      },
+    ],
   });
-
-  if (!res.ok) {
-    const detail = await res.text();
-    throw new Error(`Judge failed: ${res.status} ${detail}`);
-  }
-
-  const json = await res.json();
   const choice = json.choices[0];
   const text = (choice.message.content ?? "") as string;
   // Thinking models spend max_tokens on reasoning first. If it runs out,

@@ -1,6 +1,7 @@
 import { retrieve } from "./retrieve";
 import { calculateLeave, leaveTool } from "./tools";
 import { logRequest, promptVersion } from "./log";
+import { callGroq } from "./groq";
 
 const SYSTEM_PROMPT = `You answer employee questions using only the handbook sections provided.
 
@@ -57,27 +58,15 @@ export async function answer(question: string) {
     ];
 
     for (let step = 0; step < MAX_STEPS; step++) {
-      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: "openai/gpt-oss-120b",
-          max_tokens: 3000,
-          temperature: 0,
-          messages,
-          tools: [leaveTool], // tells the model the tool exists
-        }),
+      // callGroq retries short rate limits and server errors, and throws a
+      // GroqError for everything else (logged below, shown nicely by the caller).
+      const json = await callGroq({
+        model: "openai/gpt-oss-120b",
+        max_tokens: 3000,
+        temperature: 0,
+        messages,
+        tools: [leaveTool], // tells the model the tool exists
       });
-
-      if (!res.ok) {
-        const detail = await res.text();
-        throw new Error(`Groq failed: ${res.status} ${detail}`);
-      }
-
-      const json = await res.json();
       tokens += json.usage?.total_tokens ?? 0;
       const msg = json.choices[0].message;
 
