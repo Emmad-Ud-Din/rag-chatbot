@@ -6,4 +6,3 @@ node_modules/
 logs/
 next-env.d.ts
 *.tsbuildinfo
-data/index.json

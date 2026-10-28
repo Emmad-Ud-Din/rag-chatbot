@@ -1,6 +1,7 @@
 import { MAX_HISTORY, answerStream } from "../../../lib/answer";
 import type { Turn } from "../../../lib/rewrite";
 import { describeError, friendlyError } from "../../../lib/groq";
+import { checkLimits, visitorId } from "../../../lib/ratelimit";
 
 // lib/ reads files (the index, the logs), which needs Node, not the Edge runtime.
 export const runtime = "nodejs";
@@ -46,6 +47,16 @@ export async function POST(req: Request) {
   }
   if (question.length > MAX_QUESTION_LENGTH) {
     return Response.json({ error: "That question is too long." }, { status: 400 });
+  }
+
+  // Checked after the cheap validation above, so a malformed request does not
+  // use up the visitor's allowance, and before any paid API call.
+  const limit = await checkLimits(visitorId(req));
+  if (!limit.ok) {
+    return Response.json(
+      { error: limit.message },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfterSec) } }
+    );
   }
 
   const events = answerStream(question.trim(), cleanHistory(history));

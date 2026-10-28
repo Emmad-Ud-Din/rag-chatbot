@@ -39,6 +39,15 @@ export function deleteOldLogs(now: Date = new Date()) {
 let cleanedToday = "";
 
 export function logRequest(entry: object, now: Date = new Date()) {
+  // On Vercel the file system is read-only and each function copy is thrown away
+  // soon after, so a file would fail or vanish. Print the line instead: Vercel
+  // keeps console output in its logs view (only for a short time on the free plan,
+  // which also covers the retention rule). VERCEL is set by Vercel itself.
+  if (process.env.VERCEL) {
+    console.log(JSON.stringify(entry));
+    return;
+  }
+
   try {
     fs.mkdirSync(LOG_DIR, { recursive: true });
     // Clean up once per day per process, not on every request.
