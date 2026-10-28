@@ -133,6 +133,13 @@ Known weak spots:
 - A judge checking meaning can miss small changes in wording, for example "flights under 6 hours" becoming "≤ 6 hours".
 - Questions that need several sections are only checked against one section.
 
+## Production basics
+
+- **Logging** (`lib/log.ts`): every request writes one line with the time, prompt version (a fingerprint of the system prompt, reminder and tool description), question, retrieved sections and scores, tool calls with their results, answer, error, time taken and tokens. It is written in `finally`, so a request that fails halfway is logged with everything up to that point. With these fields you can tell a retrieval miss, wrong tool arguments, a tool bug, a model that ignored the tool result, and a date-dependent answer apart. A typical tool question costs about 2,900 tokens and 9 seconds.
+- **Privacy:** the logs hold employees' questions word for word, which can include health details. They are kept out of git, stored one file per day, and files older than 30 days are deleted. Who can read them and telling users they are logged depend on where the bot runs.
+- **Retries** (`lib/groq.ts`, `lib/embed.ts`): 429 and 5xx errors are retried, 400 and 401 are not. Groq calls retry at most twice and only when the wait is 10 seconds or less (it uses Groq's own `retry-after`, otherwise 1s then 2s). A long wait such as the daily cap fails fast. Voyage retries depend on the caller: a live question gives up after about 4 seconds, ingest waits 21 seconds up to 4 times.
+- **Errors for users:** `answer()` still throws, so a rate limit is never graded as a wrong answer in the evals. `friendlyError()` turns the error into what the employee sees ("The assistant is busy right now. Please try again in about 3 minutes."), and `try-answer.ts` uses it.
+
 ## Next steps
 
 - Run `npm run evals` on the 21 questions and read every answer, not only the FAILs
