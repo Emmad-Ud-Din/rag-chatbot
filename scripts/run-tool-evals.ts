@@ -54,13 +54,16 @@ async function main() {
       }
     }
 
-    // Checks on the rewritten question, case-insensitive.
-    const rewritten = result.searchQuestion.toLowerCase();
+    // Checks on the rewritten question, ignoring case. The model sometimes writes
+    // dates with look-alike hyphens (a non-breaking hyphen in "2020‑03‑01"), so all
+    // dash characters are turned into a plain "-" first.
+    const normalize = (t: string) => t.toLowerCase().replace(/[\u2010-\u2015\u2212]/g, "-");
+    const rewritten = normalize(result.searchQuestion);
     for (const word of e.rewriteMustContain ?? []) {
-      if (!rewritten.includes(word.toLowerCase())) problems.push(`rewrite is missing "${word}": ${result.searchQuestion}`);
+      if (!rewritten.includes(normalize(word))) problems.push(`rewrite is missing "${word}": ${result.searchQuestion}`);
     }
     for (const word of e.rewriteMustNotContain ?? []) {
-      if (rewritten.includes(word.toLowerCase())) problems.push(`rewrite should not contain "${word}": ${result.searchQuestion}`);
+      if (rewritten.includes(normalize(word))) problems.push(`rewrite should not contain "${word}": ${result.searchQuestion}`);
     }
 
     const pass = problems.length === 0;
