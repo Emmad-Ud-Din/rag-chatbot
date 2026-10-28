@@ -1,12 +1,12 @@
 import json
-import os
+import time
+from datetime import datetime, timezone
 
-import requests
-
+from .groq import call_groq
+from .log import log_request, prompt_version
 from .retrieve import retrieve
 from .tools import LEAVE_TOOL, TOOLS
 
-GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 MODEL = "openai/gpt-oss-120b"
 
 SYSTEM_PROMPT = """You answer employee questions using only the handbook sections provided.
@@ -42,75 +42,101 @@ REMINDER = (
 MAX_STEPS = 3
 
 
+# Changes whenever the prompt, the reminder or the tool description changes.
+PROMPT_VERSION = prompt_version(SYSTEM_PROMPT, REMINDER, json.dumps(LEAVE_TOOL))
+
+
 def answer(question: str) -> dict:
     """Retrieve the top sections, ask the LLM (which may call tools), and return
-    the answer, the chunks used and every tool call the model made."""
-    chunks = retrieve(question)
-    context = "\n\n---\n\n".join(c["text"] for c in chunks)
+    the answer, the chunks used and every tool call the model made.
 
-    # The conversation so far. Tool calls and their results get added to it.
-    messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {
-            "role": "user",
-            "content": f"Handbook sections:\n\n{context}\n\nQuestion: {question}\n\n{REMINDER}",
-        },
-    ]
-    # Every tool call the model made, so evals can check the arguments.
+    Every request is logged, including ones that fail halfway (a 429 on step 2,
+    say): the log entry is filled in as the request goes and written in `finally`.
+    """
+    started = time.monotonic()
+    # Every tool call the model made, with its result, for evals and the log.
     tool_calls = []
-
-    for _ in range(MAX_STEPS):
-        res = requests.post(
-            GROQ_URL,
-            headers={"Authorization": f"Bearer {os.environ['GROQ_API_KEY']}"},
-            json={
-                "model": MODEL,
-                # gpt-oss models think before answering, and thinking uses this budget.
-                "max_tokens": 3000,
-                # 0 = the same question gives (nearly) the same answer, so runs are comparable.
-                "temperature": 0,
-                "messages": messages,
-                "tools": [LEAVE_TOOL],  # tells the model the tool exists
-            },
-            timeout=120,
-        )
-        if not res.ok:
-            raise RuntimeError(f"Groq failed: {res.status_code} {res.text}")
-
-        msg = res.json()["choices"][0]["message"]
-
-        # No tool call means the model has written its answer.
-        if not msg.get("tool_calls"):
-            return {"answer": msg["content"], "chunks": chunks, "tool_calls": tool_calls}
-
-        # The model wants a tool. Record its request, run the tool, and add the
-        # result to the conversation so the next call can see it.
-        messages.append({"role": "assistant", "content": msg.get("content") or "", "tool_calls": msg["tool_calls"]})
-
-        for call in msg["tool_calls"]:
-            name = call["function"]["name"]
-            print("tool call:", name, call["function"]["arguments"])
-            try:
-                args = json.loads(call["function"]["arguments"])
-            except json.JSONDecodeError:
-                args = None
-            tool_calls.append({"name": name, "args": args})
-
-            if args is None:
-                result = {"error": "The arguments were not valid JSON."}
-            elif name in TOOLS:
-                try:
-                    result = TOOLS[name](args)
-                except (KeyError, TypeError, ValueError) as e:
-                    # A missing or wrongly typed argument. Tell the model instead of crashing.
-                    result = {"error": f"Bad arguments: {e}"}
-            else:
-                result = {"error": f"Unknown tool: {name}"}
-            messages.append({"role": "tool", "tool_call_id": call["id"], "content": json.dumps(result)})
-
-    # The cap was reached without an answer.
-    return {
-        "answer": "Sorry, I could not work that out. Please ask HR or your manager.",
-        "chunks": chunks,
-        "tool_calls": tool_calls,
+    log = {
+        "time": datetime.now(timezone.utc).isoformat(),
+        "promptVersion": PROMPT_VERSION,
+        "question": question,
+        "toolCalls": tool_calls,
     }
+    tokens = 0
+
+    try:
+        chunks = retrieve(question)
+        log["sections"] = [{"section": c["section"], "score": round(c["score"], 3)} for c in chunks]
+        context = "\n\n---\n\n".join(c["text"] for c in chunks)
+
+        # The conversation so far. Tool calls and their results get added to it.
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": f"Handbook sections:\n\n{context}\n\nQuestion: {question}\n\n{REMINDER}",
+            },
+        ]
+
+        for _ in range(MAX_STEPS):
+            # call_groq retries short rate limits and server errors, and raises an
+            # ApiError for everything else (logged below, shown nicely by the caller).
+            data = call_groq(
+                {
+                    "model": MODEL,
+                    # gpt-oss models think before answering, and thinking uses this budget.
+                    "max_tokens": 3000,
+                    # 0 = the same question gives (nearly) the same answer, so runs are comparable.
+                    "temperature": 0,
+                    "messages": messages,
+                    "tools": [LEAVE_TOOL],  # tells the model the tool exists
+                }
+            )
+            tokens += (data.get("usage") or {}).get("total_tokens", 0)
+            msg = data["choices"][0]["message"]
+
+            # No tool call means the model has written its answer.
+            if not msg.get("tool_calls"):
+                log["answer"] = msg["content"]
+                return {"answer": msg["content"], "chunks": chunks, "tool_calls": tool_calls}
+
+            # The model wants a tool. Record its request, run the tool, and add the
+            # result to the conversation so the next call can see it.
+            messages.append({"role": "assistant", "content": msg.get("content") or "", "tool_calls": msg["tool_calls"]})
+
+            for call in msg["tool_calls"]:
+                name = call["function"]["name"]
+                print("tool call:", name, call["function"]["arguments"])
+                try:
+                    args = json.loads(call["function"]["arguments"])
+                except json.JSONDecodeError:
+                    args = None
+
+                if args is None:
+                    result = {"error": "The arguments were not valid JSON."}
+                elif name in TOOLS:
+                    try:
+                        result = TOOLS[name](args)
+                    except (KeyError, TypeError, ValueError) as e:
+                        # A missing or wrongly typed argument. Tell the model instead of crashing.
+                        result = {"error": f"Bad arguments: {e}"}
+                else:
+                    result = {"error": f"Unknown tool: {name}"}
+                tool_calls.append({"name": name, "args": args, "result": result})
+                messages.append({"role": "tool", "tool_call_id": call["id"], "content": json.dumps(result)})
+
+        # The cap was reached without an answer.
+        log["answer"] = None
+        log["stepCapReached"] = True
+        return {
+            "answer": "Sorry, I could not work that out. Please ask HR or your manager.",
+            "chunks": chunks,
+            "tool_calls": tool_calls,
+        }
+    except Exception as e:
+        log["error"] = str(e)
+        raise  # still fail the request, but only after recording why
+    finally:
+        log["ms"] = round((time.monotonic() - started) * 1000)
+        log["tokens"] = tokens
+        log_request(log)

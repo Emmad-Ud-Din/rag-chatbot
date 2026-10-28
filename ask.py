@@ -5,8 +5,10 @@
 """
 
 import argparse
+import sys
 
 from rag.answer import answer
+from rag.groq import friendly_error
 from rag.retrieve import retrieve
 
 
@@ -29,7 +31,13 @@ def main() -> None:
             print(r["section"], f"{r['score']:.3f}")
         return
 
-    result = answer(args.question)
+    try:
+        result = answer(args.question)
+    except Exception as e:
+        # What the employee would see, then the real error for you.
+        print(friendly_error(e))
+        print(e, file=sys.stderr)
+        return
     print("sections:", [c["section"] for c in result["chunks"]])
     print(result["answer"])
 

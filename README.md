@@ -33,6 +33,8 @@ rag/
   retrieve.py      question -> top k chunks
   answer.py        chunks + question -> LLM (with tool loop) -> answer
   tools.py         leave calculator and its schema for the model
+  log.py           one JSON line per request in logs/YYYY-MM-DD.jsonl, kept 30 days (not committed)
+  groq.py          calls Groq with retries on short rate limits and server errors
   judge.py         LLM-as-judge for grading answers
 ingest.py          build data/index.json
 ask.py             ask one question (or --retrieve-only)
@@ -125,6 +127,15 @@ Known weak spots:
 - Seven held-out questions is a small sample.
 
 This Python port has not been run against the live APIs. It was checked offline: every file compiles, and chunking, cosine similarity, retrieval ranking, request shapes, the retry on 429, judge verdict parsing and the absence-claim pattern were tested with fake data. The tool loop was tested with a fake Groq: a tool call goes to the calculator and its result back to the model, and the step cap stops after 3 calls.
+
+## Production basics
+
+- **Logging** (`rag/log.py`): every request writes one line with the time, prompt version (a fingerprint of the system prompt, reminder and tool description), question, retrieved sections and scores, tool calls with their results, answer, error, time taken and tokens. It is written in `finally`, so a request that fails halfway is logged with everything up to that point. With these fields you can tell a retrieval miss, wrong tool arguments, a tool bug, a model that ignored the tool result, and a date-dependent answer apart.
+- **Privacy:** the logs hold employees' questions word for word, which can include health details. They are kept out of git, stored one file per day, and files older than 30 days are deleted. Who can read them and telling users they are logged depend on where the bot runs.
+- **Retries** (`rag/groq.py`, `rag/embed.py`): 429 and 5xx errors are retried, 400 and 401 are not. Groq calls retry at most twice and only when the wait is 10 seconds or less (it uses Groq's own `retry-after`, otherwise 1s then 2s). A long wait such as the daily cap fails fast. Voyage retries depend on the caller: a live question gives up after about 4 seconds, ingest waits 21 seconds up to 4 times.
+- **Errors for users:** `answer()` still raises, so a rate limit is never graded as a wrong answer in the evals. `friendly_error()` turns the error into what the employee sees ("The assistant is busy right now. Please try again in about 3 minutes."), and `ask.py` uses it.
+
+The prompt version differs between this branch and the TypeScript one, because the two languages write the tool description as JSON slightly differently. It is only meant to compare runs within one version.
 
 ## Next steps
 

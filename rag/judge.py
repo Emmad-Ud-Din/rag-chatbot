@@ -1,12 +1,10 @@
-import os
 import re
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
-import requests
+from .groq import call_groq
 
-GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 MODEL = "openai/gpt-oss-120b"
 
 
@@ -64,10 +62,8 @@ class Verdict:
 
 def judge(item: dict, answer: str, sources: str) -> Verdict:
     """Grade one answer. `item` is one entry from data/evals.json."""
-    res = requests.post(
-        GROQ_URL,
-        headers={"Authorization": f"Bearer {os.environ['GROQ_API_KEY']}"},
-        json={
+    data = call_groq(
+        {
             "model": MODEL,
             # gpt-oss thinks before answering and thinking uses this budget. The judge
             # prompt is long (full handbook, check lines), so 1500 sometimes left no
@@ -89,13 +85,9 @@ def judge(item: dict, answer: str, sources: str) -> Verdict:
                     ),
                 },
             ],
-        },
-        timeout=120,
+        }
     )
-    if not res.ok:
-        raise RuntimeError(f"Judge failed: {res.status_code} {res.text}")
-
-    choice = res.json()["choices"][0]
+    choice = data["choices"][0]
     text = choice["message"].get("content") or ""
     # Thinking models spend max_tokens on reasoning first. If it runs out,
     # the reply is empty. Fail loudly instead of counting it as a FAIL.

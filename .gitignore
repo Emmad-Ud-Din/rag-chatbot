@@ -7,3 +7,4 @@ venv/
 *.log
 data/index.json
 node_modules/
+logs/
