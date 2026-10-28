@@ -2,6 +2,7 @@ import { retrieve } from "./retrieve";
 import { calculateLeave, leaveTool } from "./tools";
 import { logRequest, promptVersion } from "./log";
 import { describeError, streamGroq } from "./groq";
+import { REWRITE_PROMPT, rewriteQuestion, type Turn } from "./rewrite";
 
 const SYSTEM_PROMPT = `You answer employee questions using only the handbook sections provided.
 
@@ -26,8 +27,12 @@ const REMINDER = "Reminder: if any section mentions something related to the que
 // Stops the loop if the model keeps calling tools without ever answering.
 const MAX_STEPS = 3;
 
+// How many earlier messages (questions and answers) the model sees. Every one is
+// resent on every request, so more history means more tokens and a slower answer.
+export const MAX_HISTORY = 6;
+
 // Changes whenever the prompt, the reminder or the tool description changes.
-const PROMPT_VERSION = promptVersion(SYSTEM_PROMPT, REMINDER, JSON.stringify(leaveTool));
+const PROMPT_VERSION = promptVersion(SYSTEM_PROMPT, REMINDER, JSON.stringify(leaveTool), REWRITE_PROMPT);
 
 // What the employee sees while a tool runs, so they know what is happening.
 const TOOL_STATUS: Record<string, string> = {
@@ -49,7 +54,12 @@ export type AnswerEvent =
   | { type: "text"; delta: string }
   | { type: "done"; result: AnswerResult };
 
-export async function* answerStream(question: string): AsyncGenerator<AnswerEvent> {
+// `history` is the conversation so far, oldest first, without the new question.
+export async function* answerStream(
+  question: string,
+  history: Turn[] = []
+): AsyncGenerator<AnswerEvent> {
+  history = history.slice(-MAX_HISTORY);
   // Filled in as the request goes, and written in `finally`, so a request that
   // crashes halfway (a 429 on step 2, say) is logged with everything up to that point.
   // `finally` also runs if the employee closes the chat mid-answer.
@@ -58,6 +68,7 @@ export async function* answerStream(question: string): AsyncGenerator<AnswerEven
     time: new Date().toISOString(),
     promptVersion: PROMPT_VERSION,
     question,
+    historyLength: history.length,
   };
   // Every tool call the model made, with its result, for evals and the log.
   const toolCalls: ToolCall[] = [];
@@ -66,14 +77,26 @@ export async function* answerStream(question: string): AsyncGenerator<AnswerEven
   let firstTextMs: number | null = null;
 
   try {
+    // A follow-up like "what if i take 3 more" is rewritten into a complete
+    // question for retrieval. The first message in a chat skips this extra call.
+    let searchQuestion = question;
+    if (history.length > 0) {
+      yield { type: "status", text: "Reading the conversation..." };
+      searchQuestion = await rewriteQuestion(history, question);
+      log.rewrittenQuestion = searchQuestion;
+    }
+
     yield { type: "status", text: "Looking up the handbook..." };
-    const chunks = await retrieve(question);
+    const chunks = await retrieve(searchQuestion);
     log.sections = chunks.map((c) => ({ section: c.section, score: Number(c.score.toFixed(3)) }));
     const context = chunks.map((c) => c.text).join("\n\n---\n\n");
 
     // The conversation so far. Tool calls and their results get added to it.
+    // The earlier turns go in as plain messages, so the model can see what "3 more"
+    // refers to. The handbook sections are attached only to the new question.
     const messages: any[] = [
       { role: "system", content: SYSTEM_PROMPT },
+      ...history.map((t) => ({ role: t.role, content: t.content })),
       {
         role: "user",
         content: `Handbook sections:\n\n${context}\n\nQuestion: ${question}\n\n${REMINDER}`,
@@ -178,8 +201,8 @@ export async function* answerStream(question: string): AsyncGenerator<AnswerEven
 }
 
 // The whole answer at once, for evals and scripts that don't stream.
-export async function answer(question: string): Promise<AnswerResult> {
-  for await (const event of answerStream(question)) {
+export async function answer(question: string, history: Turn[] = []): Promise<AnswerResult> {
+  for await (const event of answerStream(question, history)) {
     if (event.type === "done") return event.result;
   }
   throw new Error("answerStream ended without a done event");

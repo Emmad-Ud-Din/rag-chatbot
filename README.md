@@ -47,6 +47,7 @@ npm run dev        # then open http://localhost:3000
 On Windows behind a proxy or antivirus, set `NODE_USE_SYSTEM_CA=1` first, as for the scripts. Next.js reads the keys from `.env.local` by itself.
 
 - `app/api/chat/route.ts` takes `{ "question": "..." }` and sends `answerStream()` events back as NDJSON, one JSON event per line, as soon as each happens. The `done` event reaches the browser without the retrieved text or tool calls, which stay in the server log. Errors become `{ "type": "error" }` with the friendly message. If the employee closes the page mid-answer, the stream is cancelled and the request is still logged.
+- **Follow-up questions:** the page sends the conversation so far with each question, and the route keeps the last 6 messages. The model sees those turns before the new question, so it knows what "what if I take 3 more" refers to. Retrieval needs more: embedding "what if I take 3 more" on its own finds the wrong sections, and joining it with the earlier messages drags the old topic along when the employee changes subject ("and what about sick days?"). So `lib/rewrite.ts` first rewrites a follow-up into a question that stands on its own, and retrieval searches with that. The rewrite is a separate call with `reasoning_effort: "low"`, which is fine for this simple task even though it hurt answer quality. The first message in a chat skips it. The log records `rewrittenQuestion` and `historyLength`.
 - `package.json` has an `overrides` entry for `postcss`. Next.js 15 bundles PostCSS 8.4.31, which `npm audit` flags (XSS and file-read issues that need attacker-controlled CSS; this project only processes its own `globals.css`). The override swaps in a fixed 8.5.x without moving to Next.js 16. Remove it after upgrading Next.js.
 - `app/page.tsx` shows status lines while waiting, adds each text piece as it arrives, and renders the bold text and lists the model writes as React elements, never as raw HTML. It tells employees that questions are kept for 30 days.
 
@@ -67,6 +68,7 @@ lib/
   retrieve.ts      question -> top k chunks
   answer.ts        chunks + question -> LLM (with tool loop) -> answer
   tools.ts         leave calculator and its schema for the model
+  rewrite.ts       turns a follow-up into a standalone question for retrieval
   log.ts           one JSON line per request in logs/YYYY-MM-DD.jsonl, kept 30 days (not committed)
   groq.ts          calls Groq with retries on short rate limits and server errors
   judge.ts         LLM-as-judge for grading answers

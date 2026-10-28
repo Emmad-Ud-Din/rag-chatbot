@@ -71,6 +71,11 @@ export default function ChatPage() {
     if (!question || busy) return;
     setBusy(true);
     setInput("");
+    // The conversation so far, so the bot can understand follow-ups like
+    // "what if I take 3 more". Failed answers and empty ones are left out.
+    const history = messages
+      .filter((m) => m.text && !m.error)
+      .map((m) => ({ role: m.role, content: m.text }));
     setMessages((all) => [
       ...all,
       { role: "user", text: question },
@@ -81,7 +86,7 @@ export default function ChatPage() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question }),
+        body: JSON.stringify({ question, history }),
       });
       if (!res.ok || !res.body) {
         const body = await res.json().catch(() => ({}));
