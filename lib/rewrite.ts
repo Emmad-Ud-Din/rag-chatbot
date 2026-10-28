@@ -10,9 +10,12 @@ export type Turn = { role: "user" | "assistant"; content: string };
 // along when the employee changes subject ("and what about sick days?").
 export const REWRITE_PROMPT = `You rewrite an employee's latest chat message so it can be understood without the conversation before it.
 
+The rewritten question is used to search the employee handbook and is then answered by an assistant that may need to calculate things. Write it so that someone who has not seen the conversation could answer it from scratch.
+
 Rules:
-- Keep every detail from the conversation that the latest message depends on, such as dates, numbers of days, and which policy or type of leave is meant.
-- If the latest message changes topic, rewrite only the new topic and leave out the old one.
+- Include every fact from the conversation needed to answer the question from scratch. Do not rely on earlier answers: if an earlier answer said "17 days left", include the facts that produced it (such as the join date and the days already used), not the result.
+- For a "what if" question, combine the earlier facts with the new ones, for example days already used plus the extra days.
+- Leave out facts the new question does not need. If the latest message changes topic, rewrite only the new topic.
 - If the latest message already makes sense on its own, return it unchanged.
 - Do not answer the question and do not add facts that are not in the conversation.
 - Reply with only the rewritten question, nothing else.`;
