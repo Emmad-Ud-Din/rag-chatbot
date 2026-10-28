@@ -1,7 +1,7 @@
 import { retrieve } from "./retrieve";
 import { calculateLeave, leaveTool } from "./tools";
 import { logRequest, promptVersion } from "./log";
-import { streamGroq } from "./groq";
+import { describeError, streamGroq } from "./groq";
 
 const SYSTEM_PROMPT = `You answer employee questions using only the handbook sections provided.
 
@@ -167,7 +167,7 @@ export async function* answerStream(question: string): AsyncGenerator<AnswerEven
     yield { type: "text", delta: fallback };
     yield { type: "done", result: { answer: fallback, chunks, toolCalls } };
   } catch (err) {
-    log.error = String(err);
+    log.error = describeError(err);
     throw err; // still fail the request, but only after recording why
   } finally {
     log.ms = Date.now() - started;

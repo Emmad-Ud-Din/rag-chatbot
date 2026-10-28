@@ -105,6 +105,19 @@ export async function* streamGroq(body: object, sleepFn = sleep): AsyncGenerator
   }
 }
 
+// The full error text, including the cause. Node's fetch throws a bare
+// "fetch failed" and puts the real reason (SELF_SIGNED_CERT_IN_CHAIN, ENOTFOUND,
+// ECONNRESET...) in `err.cause`, so without this the log and the terminal hide it.
+export function describeError(err: unknown): string {
+  let text = String(err);
+  let cause = (err as any)?.cause;
+  while (cause) {
+    text += ` | cause: ${cause.code ? cause.code + " " : ""}${cause.message ?? String(cause)}`;
+    cause = cause.cause;
+  }
+  return text;
+}
+
 // What to show the employee when a request failed. Lives here so every
 // interface (terminal script now, chat UI later) says the same thing.
 export function friendlyError(err: unknown) {

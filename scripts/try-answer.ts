@@ -1,5 +1,5 @@
 import { answerStream } from "../lib/answer";
-import { friendlyError } from "../lib/groq";
+import { describeError, friendlyError } from "../lib/groq";
 
 // Usage: npx tsx --env-file=.env.local scripts/try-answer.ts "your question"
 // Prints the answer as it streams: status lines in grey, then the text piece by piece.
@@ -15,7 +15,7 @@ async function main() {
   } catch (err) {
     // What the employee would see, then the real error for you.
     console.log(friendlyError(err));
-    console.error(String(err));
+    console.error(describeError(err));
   }
 }
 
