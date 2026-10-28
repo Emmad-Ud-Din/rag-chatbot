@@ -59,7 +59,7 @@ export async function answer(question: string) {
 
     for (let step = 0; step < MAX_STEPS; step++) {
       // callGroq retries short rate limits and server errors, and throws a
-      // GroqError for everything else (logged below, shown nicely by the caller).
+      // ApiError for everything else (logged below, shown nicely by the caller).
       const json = await callGroq({
         model: "openai/gpt-oss-120b",
         max_tokens: 3000,

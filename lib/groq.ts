@@ -11,16 +11,18 @@ const MAX_WAIT_MS = 10_000;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-// Thrown when Groq fails. `temporary` tells the caller whether trying again
-// later could work, so the chat UI can show "busy, try again" instead of a crash.
-export class GroqError extends Error {
+// Thrown when an API call fails (Groq here, Voyage in embed.ts). `temporary`
+// tells the caller whether trying again later could work, so the chat UI can
+// show "busy, try again" instead of "something went wrong".
+export class ApiError extends Error {
   constructor(
+    public service: string,
     public status: number,
     public detail: string,
     public temporary: boolean,
     public retryAfterMs: number | null
   ) {
-    super(`Groq failed: ${status} ${detail}`);
+    super(`${service} failed: ${status} ${detail}`);
   }
 }
 
@@ -54,7 +56,7 @@ export async function callGroq(body: object, sleepFn = sleep) {
     const waitMs = waitFromResponse(res, detail) ?? 1000 * 2 ** attempt;
 
     if (!temporary || attempt >= MAX_RETRIES || waitMs > MAX_WAIT_MS) {
-      throw new GroqError(res.status, detail, temporary, temporary ? waitMs : null);
+      throw new ApiError("Groq", res.status, detail, temporary, temporary ? waitMs : null);
     }
     console.error(`Groq ${res.status}, retrying in ${Math.round(waitMs / 1000)}s`);
     await sleepFn(waitMs);
@@ -64,7 +66,7 @@ export async function callGroq(body: object, sleepFn = sleep) {
 // What to show the employee when a request failed. Lives here so every
 // interface (terminal script now, chat UI later) says the same thing.
 export function friendlyError(err: unknown) {
-  if (err instanceof GroqError && err.temporary) {
+  if (err instanceof ApiError && err.temporary) {
     const minutes = err.retryAfterMs ? Math.ceil(err.retryAfterMs / 60_000) : 1;
     return `The assistant is busy right now. Please try again in about ${minutes} minute${minutes === 1 ? "" : "s"}.`;
   }
