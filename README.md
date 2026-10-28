@@ -50,6 +50,7 @@ lib/
   retrieve.ts      question -> top k chunks
   answer.ts        chunks + question -> LLM (with tool loop) -> answer
   tools.ts         leave calculator and its schema for the model
+  log.ts           one JSON line per request in logs/requests.jsonl (not committed)
   judge.ts         LLM-as-judge for grading answers
 scripts/
   ingest.ts        build data/index.json
@@ -137,5 +138,4 @@ Known weak spots:
 - Add more held-out questions, including ones that need several sections
 - Leave calculator: first-year proration, once HR answers the "accrues monthly" question
 - Streaming chat UI in Next.js (`app/`)
-- Log the question, retrieved chunks and answer for every request
 - Later: reranking, hybrid search, structured outputs

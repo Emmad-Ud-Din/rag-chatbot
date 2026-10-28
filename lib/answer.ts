@@ -1,5 +1,6 @@
 import { retrieve } from "./retrieve";
 import { calculateLeave, leaveTool } from "./tools";
+import { logRequest, promptVersion } from "./log";
 
 const SYSTEM_PROMPT = `You answer employee questions using only the handbook sections provided.
 
@@ -17,82 +18,113 @@ Rules:
 - Never mention tools to the employee. Present tool results as your own answer, for example "your carried-over days expired on March 31", not "the tool indicates".
 - Keep answers short and direct.`;
 
+// The reminder sits next to the question on purpose: models weight the last
+// thing they read, and the system prompt rule alone was not enough.
+const REMINDER = "Reminder: if any section mentions something related to the question, tell the employee about it, even if it is unclear whether it applies. If the sections fully answer the question, answer it and stop, without adding statements about what the handbook does not cover. A detail in the question only counts as a part the handbook does not cover if the answer would be different depending on what the handbook said about it. If they answer only part of it, give that part, then say clearly which part the handbook does not cover.";
+
 // Stops the loop if the model keeps calling tools without ever answering.
 const MAX_STEPS = 3;
 
+// Changes whenever the prompt, the reminder or the tool description changes.
+const PROMPT_VERSION = promptVersion(SYSTEM_PROMPT, REMINDER, JSON.stringify(leaveTool));
+
 export async function answer(question: string) {
-  const chunks = await retrieve(question);
-  const context = chunks.map((c) => c.text).join("\n\n---\n\n");
-
-  // The conversation so far. Tool calls and their results get added to it.
-  const messages: any[] = [
-    { role: "system", content: SYSTEM_PROMPT },
-    {
-      role: "user",
-      content: `Handbook sections:\n\n${context}\n\nQuestion: ${question}\n\nReminder: if any section mentions something related to the question, tell the employee about it, even if it is unclear whether it applies. If the sections fully answer the question, answer it and stop, without adding statements about what the handbook does not cover. A detail in the question only counts as a part the handbook does not cover if the answer would be different depending on what the handbook said about it. If they answer only part of it, give that part, then say clearly which part the handbook does not cover.`,
-    },
-  ];
-  // Every tool call the model made, so evals can check the arguments.
-  const toolCalls: { name: string; args: any }[] = [];
-
-  for (let step = 0; step < MAX_STEPS; step++) {
-    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "openai/gpt-oss-120b",
-        max_tokens: 3000,
-        temperature: 0,
-        messages,
-        tools: [leaveTool], // tells the model the tool exists
-      }),
-    });
-
-    if (!res.ok) {
-      const detail = await res.text();
-      throw new Error(`Groq failed: ${res.status} ${detail}`);
-    }
-
-    const json = await res.json();
-    const msg = json.choices[0].message;
-
-    // No tool call means the model has written its answer.
-    if (!msg.tool_calls?.length) {
-      return { answer: msg.content as string, chunks, toolCalls };
-    }
-
-    // The model wants a tool. Record its request, run the tool, and add the
-    // result to the conversation so the next call can see it.
-    messages.push({ role: "assistant", content: msg.content ?? "", tool_calls: msg.tool_calls });
-
-    for (const call of msg.tool_calls) {
-      console.log("tool call:", call.function.name, call.function.arguments);
-
-      let args: any = null;
-      try {
-        args = JSON.parse(call.function.arguments);
-      } catch {}
-      toolCalls.push({ name: call.function.name, args });
-
-      let result;
-      if (args === null) {
-        result = { error: "The arguments were not valid JSON." };
-      } else if (call.function.name === "calculate_leave") {
-        result = calculateLeave(args);
-      } else {
-        result = { error: `Unknown tool: ${call.function.name}` };
-      }
-      messages.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(result) });
-    }
-  } // end of the step loop
-
-  // The cap was reached without an answer.
-  return {
-    answer: "Sorry, I could not work that out. Please ask HR or your manager.",
-    chunks,
-    toolCalls,
+  // Filled in as the request goes, and written in `finally`, so a request that
+  // crashes halfway (a 429 on step 2, say) is logged with everything up to that point.
+  const started = Date.now();
+  const log: Record<string, unknown> = {
+    time: new Date().toISOString(),
+    promptVersion: PROMPT_VERSION,
+    question,
   };
+  // Every tool call the model made, with its result, for evals and the log.
+  const toolCalls: { name: string; args: any; result?: unknown }[] = [];
+  log.toolCalls = toolCalls;
+  let tokens = 0;
+
+  try {
+    const chunks = await retrieve(question);
+    log.sections = chunks.map((c) => ({ section: c.section, score: Number(c.score.toFixed(3)) }));
+    const context = chunks.map((c) => c.text).join("\n\n---\n\n");
+
+    // The conversation so far. Tool calls and their results get added to it.
+    const messages: any[] = [
+      { role: "system", content: SYSTEM_PROMPT },
+      {
+        role: "user",
+        content: `Handbook sections:\n\n${context}\n\nQuestion: ${question}\n\n${REMINDER}`,
+      },
+    ];
+
+    for (let step = 0; step < MAX_STEPS; step++) {
+      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: "openai/gpt-oss-120b",
+          max_tokens: 3000,
+          temperature: 0,
+          messages,
+          tools: [leaveTool], // tells the model the tool exists
+        }),
+      });
+
+      if (!res.ok) {
+        const detail = await res.text();
+        throw new Error(`Groq failed: ${res.status} ${detail}`);
+      }
+
+      const json = await res.json();
+      tokens += json.usage?.total_tokens ?? 0;
+      const msg = json.choices[0].message;
+
+      // No tool call means the model has written its answer.
+      if (!msg.tool_calls?.length) {
+        log.answer = msg.content;
+        return { answer: msg.content as string, chunks, toolCalls };
+      }
+
+      // The model wants a tool. Record its request, run the tool, and add the
+      // result to the conversation so the next call can see it.
+      messages.push({ role: "assistant", content: msg.content ?? "", tool_calls: msg.tool_calls });
+
+      for (const call of msg.tool_calls) {
+        console.log("tool call:", call.function.name, call.function.arguments);
+
+        let args: any = null;
+        try {
+          args = JSON.parse(call.function.arguments);
+        } catch {}
+        let result;
+        if (args === null) {
+          result = { error: "The arguments were not valid JSON." };
+        } else if (call.function.name === "calculate_leave") {
+          result = calculateLeave(args);
+        } else {
+          result = { error: `Unknown tool: ${call.function.name}` };
+        }
+        toolCalls.push({ name: call.function.name, args, result });
+        messages.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(result) });
+      }
+    } // end of the step loop
+
+    // The cap was reached without an answer.
+    log.answer = null;
+    log.stepCapReached = true;
+    return {
+      answer: "Sorry, I could not work that out. Please ask HR or your manager.",
+      chunks,
+      toolCalls,
+    };
+  } catch (err) {
+    log.error = String(err);
+    throw err; // still fail the request, but only after recording why
+  } finally {
+    log.ms = Date.now() - started;
+    log.tokens = tokens;
+    logRequest(log);
+  }
 }
