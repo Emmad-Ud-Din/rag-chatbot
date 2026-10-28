@@ -36,8 +36,10 @@ function waitFromResponse(res: Response, detail: string): number | null {
   return null;
 }
 
+// Sends the request and retries temporary errors. Returns the response once it
+// is OK, so callGroq can read it whole and streamGroq can read it piece by piece.
 // `sleepFn` is a parameter so tests can skip the real waiting.
-export async function callGroq(body: object, sleepFn = sleep) {
+async function postWithRetries(body: object, sleepFn = sleep): Promise<Response> {
   for (let attempt = 0; ; attempt++) {
     const res = await fetch(URL, {
       method: "POST",
@@ -48,7 +50,7 @@ export async function callGroq(body: object, sleepFn = sleep) {
       body: JSON.stringify(body),
     });
 
-    if (res.ok) return res.json();
+    if (res.ok) return res;
 
     const detail = await res.text();
     const temporary = res.status === 429 || res.status >= 500;
@@ -60,6 +62,46 @@ export async function callGroq(body: object, sleepFn = sleep) {
     }
     console.error(`Groq ${res.status}, retrying in ${Math.round(waitMs / 1000)}s`);
     await sleepFn(waitMs);
+  }
+}
+
+// The whole reply at once. Used by the judge, which has nobody waiting on it.
+export async function callGroq(body: object, sleepFn = sleep) {
+  const res = await postWithRetries(body, sleepFn);
+  return res.json();
+}
+
+// The reply in pieces, as the model writes it. Groq sends Server-Sent Events:
+// lines like `data: {...}`, ending with `data: [DONE]`. Each yielded value is one
+// parsed chunk, with the new text in `choices[0].delta`.
+//
+// Retries only happen before the stream starts. Once text is on the employee's
+// screen, a failure can't be retried silently, so it is thrown instead.
+export async function* streamGroq(body: object, sleepFn = sleep): AsyncGenerator<any> {
+  const res = await postWithRetries({ ...body, stream: true }, sleepFn);
+  if (!res.body) throw new ApiError("Groq", res.status, "empty stream", true, null);
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  // Network reads don't line up with lines: one `data:` line can arrive split
+  // across two reads. Keep the unfinished end of the text until the rest comes.
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? ""; // the last piece may be an unfinished line
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("data:")) continue; // blank lines and comments
+      const data = trimmed.slice(5).trim();
+      if (data === "[DONE]") return;
+      yield JSON.parse(data);
+    }
   }
 }
 

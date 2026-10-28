@@ -1,7 +1,7 @@
 import { retrieve } from "./retrieve";
 import { calculateLeave, leaveTool } from "./tools";
 import { logRequest, promptVersion } from "./log";
-import { callGroq } from "./groq";
+import { streamGroq } from "./groq";
 
 const SYSTEM_PROMPT = `You answer employee questions using only the handbook sections provided.
 
@@ -29,9 +29,30 @@ const MAX_STEPS = 3;
 // Changes whenever the prompt, the reminder or the tool description changes.
 const PROMPT_VERSION = promptVersion(SYSTEM_PROMPT, REMINDER, JSON.stringify(leaveTool));
 
-export async function answer(question: string) {
+// What the employee sees while a tool runs, so they know what is happening.
+const TOOL_STATUS: Record<string, string> = {
+  calculate_leave: "Checking your leave balance...",
+};
+
+type ToolCall = { name: string; args: any; result?: unknown };
+type Chunk = Awaited<ReturnType<typeof retrieve>>[number];
+
+// Everything about a finished request: what evals and the log need.
+export type AnswerResult = { answer: string; chunks: Chunk[]; toolCalls: ToolCall[] };
+
+// The events a chat UI receives, in order:
+//   status  a short note while retrieval or a tool runs ("Checking your leave balance...")
+//   text    the next piece of the answer, to add to what is already shown
+//   done    the whole answer, chunks and tool calls, for logs and evals
+export type AnswerEvent =
+  | { type: "status"; text: string }
+  | { type: "text"; delta: string }
+  | { type: "done"; result: AnswerResult };
+
+export async function* answerStream(question: string): AsyncGenerator<AnswerEvent> {
   // Filled in as the request goes, and written in `finally`, so a request that
   // crashes halfway (a 429 on step 2, say) is logged with everything up to that point.
+  // `finally` also runs if the employee closes the chat mid-answer.
   const started = Date.now();
   const log: Record<string, unknown> = {
     time: new Date().toISOString(),
@@ -39,11 +60,13 @@ export async function answer(question: string) {
     question,
   };
   // Every tool call the model made, with its result, for evals and the log.
-  const toolCalls: { name: string; args: any; result?: unknown }[] = [];
+  const toolCalls: ToolCall[] = [];
   log.toolCalls = toolCalls;
   let tokens = 0;
+  let firstTextMs: number | null = null;
 
   try {
+    yield { type: "status", text: "Looking up the handbook..." };
     const chunks = await retrieve(question);
     log.sections = chunks.map((c) => ({ section: c.section, score: Number(c.score.toFixed(3)) }));
     const context = chunks.map((c) => c.text).join("\n\n---\n\n");
@@ -58,62 +81,106 @@ export async function answer(question: string) {
     ];
 
     for (let step = 0; step < MAX_STEPS; step++) {
-      // callGroq retries short rate limits and server errors, and throws a
-      // ApiError for everything else (logged below, shown nicely by the caller).
-      const json = await callGroq({
+      // What this step's stream adds up to. Text is passed on as it arrives.
+      // Tool calls arrive in pieces too (the arguments as fragments of a JSON
+      // string), so they are collected and only parsed once the step is over.
+      let content = "";
+      const pending: { id: string; name: string; args: string }[] = [];
+
+      // streamGroq retries short rate limits before the stream starts, and throws
+      // an ApiError for everything else (logged below, shown nicely by the caller).
+      for await (const chunk of streamGroq({
         model: "openai/gpt-oss-120b",
         max_tokens: 3000,
         temperature: 0,
         messages,
         tools: [leaveTool], // tells the model the tool exists
-      });
-      tokens += json.usage?.total_tokens ?? 0;
-      const msg = json.choices[0].message;
+      })) {
+        // Groq puts the token count on the last chunk, under x_groq.
+        const usage = chunk.usage ?? chunk.x_groq?.usage;
+        if (usage) tokens += usage.total_tokens ?? 0;
+
+        const delta = chunk.choices?.[0]?.delta;
+        if (!delta) continue;
+
+        if (delta.content) {
+          content += delta.content;
+          if (firstTextMs === null) firstTextMs = Date.now() - started;
+          yield { type: "text", delta: delta.content };
+        }
+        for (const piece of delta.tool_calls ?? []) {
+          // `index` says which tool call this piece belongs to; the first piece
+          // of each call carries its id and name.
+          const call = (pending[piece.index] ??= { id: "", name: "", args: "" });
+          if (piece.id) call.id = piece.id;
+          if (piece.function?.name) call.name += piece.function.name;
+          if (piece.function?.arguments) call.args += piece.function.arguments;
+        }
+      }
 
       // No tool call means the model has written its answer.
-      if (!msg.tool_calls?.length) {
-        log.answer = msg.content;
-        return { answer: msg.content as string, chunks, toolCalls };
+      if (pending.length === 0) {
+        log.answer = content;
+        yield { type: "done", result: { answer: content, chunks, toolCalls } };
+        return;
       }
 
       // The model wants a tool. Record its request, run the tool, and add the
       // result to the conversation so the next call can see it.
-      messages.push({ role: "assistant", content: msg.content ?? "", tool_calls: msg.tool_calls });
+      messages.push({
+        role: "assistant",
+        content,
+        tool_calls: pending.map((c) => ({
+          id: c.id,
+          type: "function",
+          function: { name: c.name, arguments: c.args },
+        })),
+      });
 
-      for (const call of msg.tool_calls) {
-        console.log("tool call:", call.function.name, call.function.arguments);
+      for (const call of pending) {
+        console.log("tool call:", call.name, call.args);
+        yield { type: "status", text: TOOL_STATUS[call.name] ?? "Working on it..." };
 
+        // Now the arguments string is complete, so it can be parsed.
         let args: any = null;
         try {
-          args = JSON.parse(call.function.arguments);
+          args = JSON.parse(call.args);
         } catch {}
+
         let result;
         if (args === null) {
           result = { error: "The arguments were not valid JSON." };
-        } else if (call.function.name === "calculate_leave") {
+        } else if (call.name === "calculate_leave") {
           result = calculateLeave(args);
         } else {
-          result = { error: `Unknown tool: ${call.function.name}` };
+          result = { error: `Unknown tool: ${call.name}` };
         }
-        toolCalls.push({ name: call.function.name, args, result });
+        toolCalls.push({ name: call.name, args, result });
         messages.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(result) });
       }
     } // end of the step loop
 
     // The cap was reached without an answer.
+    const fallback = "Sorry, I could not work that out. Please ask HR or your manager.";
     log.answer = null;
     log.stepCapReached = true;
-    return {
-      answer: "Sorry, I could not work that out. Please ask HR or your manager.",
-      chunks,
-      toolCalls,
-    };
+    yield { type: "text", delta: fallback };
+    yield { type: "done", result: { answer: fallback, chunks, toolCalls } };
   } catch (err) {
     log.error = String(err);
     throw err; // still fail the request, but only after recording why
   } finally {
     log.ms = Date.now() - started;
+    log.firstTextMs = firstTextMs; // time to first token, as the employee feels it
     log.tokens = tokens;
     logRequest(log);
   }
+}
+
+// The whole answer at once, for evals and scripts that don't stream.
+export async function answer(question: string): Promise<AnswerResult> {
+  for await (const event of answerStream(question)) {
+    if (event.type === "done") return event.result;
+  }
+  throw new Error("answerStream ended without a done event");
 }
