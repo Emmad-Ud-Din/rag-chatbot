@@ -50,7 +50,7 @@ lib/
   retrieve.ts      question -> top k chunks
   answer.ts        chunks + question -> LLM (with tool loop) -> answer
   tools.ts         leave calculator and its schema for the model
-  log.ts           one JSON line per request in logs/requests.jsonl (not committed)
+  log.ts           one JSON line per request in logs/YYYY-MM-DD.jsonl, kept 30 days (not committed)
   judge.ts         LLM-as-judge for grading answers
 scripts/
   ingest.ts        build data/index.json
