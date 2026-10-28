@@ -43,7 +43,14 @@ type ToolCall = { name: string; args: any; result?: unknown };
 type Chunk = Awaited<ReturnType<typeof retrieve>>[number];
 
 // Everything about a finished request: what evals and the log need.
-export type AnswerResult = { answer: string; chunks: Chunk[]; toolCalls: ToolCall[] };
+// `searchQuestion` is what retrieval searched with: the question itself, or the
+// rewritten one for a follow-up.
+export type AnswerResult = {
+  answer: string;
+  chunks: Chunk[];
+  toolCalls: ToolCall[];
+  searchQuestion: string;
+};
 
 // The events a chat UI receives, in order:
 //   status  a short note while retrieval or a tool runs ("Checking your leave balance...")
@@ -144,7 +151,7 @@ export async function* answerStream(
       // No tool call means the model has written its answer.
       if (pending.length === 0) {
         log.answer = content;
-        yield { type: "done", result: { answer: content, chunks, toolCalls } };
+        yield { type: "done", result: { answer: content, chunks, toolCalls, searchQuestion } };
         return;
       }
 
@@ -188,7 +195,7 @@ export async function* answerStream(
     log.answer = null;
     log.stepCapReached = true;
     yield { type: "text", delta: fallback };
-    yield { type: "done", result: { answer: fallback, chunks, toolCalls } };
+    yield { type: "done", result: { answer: fallback, chunks, toolCalls, searchQuestion } };
   } catch (err) {
     log.error = describeError(err);
     throw err; // still fail the request, but only after recording why

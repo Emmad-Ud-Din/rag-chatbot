@@ -2,7 +2,16 @@
   {
     "id": 1,
     "question": "I joined on 2020-03-01 and used 8 days of annual leave this year. How many days do I have left?",
-    "expect": { "joinDate": "2020-03-01", "daysUsed": 8, "carriedOver": 0, "baseDays": 20, "increasedDays": 25, "yearsNeeded": 5, "maxCarryOver": 5, "carryOverExpires": "03-31" }
+    "expect": {
+      "joinDate": "2020-03-01",
+      "daysUsed": 8,
+      "carriedOver": 0,
+      "baseDays": 20,
+      "increasedDays": 25,
+      "yearsNeeded": 5,
+      "maxCarryOver": 5,
+      "carryOverExpires": "03-31"
+    }
   },
   {
     "id": 2,
@@ -17,6 +26,54 @@
   {
     "id": 4,
     "question": "I joined on 2020-03-01, carried over 7 days from last year and used 8 days this year. How many days do I have left?",
-    "expect": { "joinDate": "2020-03-01", "daysUsed": 8, "carriedOver": 7, "maxCarryOver": 5 }
+    "expect": {
+      "joinDate": "2020-03-01",
+      "daysUsed": 8,
+      "carriedOver": 7,
+      "maxCarryOver": 5
+    }
+  },
+  {
+    "id": 5,
+    "history": [
+      {
+        "role": "user",
+        "content": "I joined on 2020-03-01 and used 8 days of annual leave. How many are left?"
+      },
+      {
+        "role": "assistant",
+        "content": "You have 17 days of annual leave remaining (25 days, since you have more than five years of service, minus the 8 you used)."
+      }
+    ],
+    "question": "what if i take 3 more",
+    "expect": {
+      "joinDate": "2020-03-01",
+      "daysUsed": 11
+    },
+    "rewriteMustContain": [
+      "2020-03-01",
+      "8"
+    ]
+  },
+  {
+    "id": 6,
+    "history": [
+      {
+        "role": "user",
+        "content": "I joined on 2020-03-01 and used 8 days of annual leave. How many are left?"
+      },
+      {
+        "role": "assistant",
+        "content": "You have 17 days of annual leave remaining (25 days, since you have more than five years of service, minus the 8 you used)."
+      }
+    ],
+    "question": "and what about sick days?",
+    "expect": null,
+    "rewriteMustContain": [
+      "sick"
+    ],
+    "rewriteMustNotContain": [
+      "annual"
+    ]
   }
 ]
