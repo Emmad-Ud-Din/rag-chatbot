@@ -122,6 +122,8 @@ Sixth run (full): 19/21. Q2 and Q7 failed, and reading them showed the bot dropp
 - Side-effect checks after these rules: Q5 and Q21 kept their conditions without padding, Q17 and Q19 kept their real gaps, and Q10 was clean in two runs ("including from your sofa", no disclaimer).
 - The judge sometimes returned empty text: `gpt-oss` spends `max_tokens` on thinking first. The judge now has `max_tokens: 3000` and throws an error on an empty reply instead of counting it as a FAIL.
 
+Seventh run (full): 20/21 with 0 absence claims. Q7 failed (it passes about half the time), and Q2, Q8 and Q10 gave their best answers so far: "approved in advance by a manager", no borrowed rule for damaged laptops, and "working from your sofa all week would exceed that limit".
+
 Known weak spots:
 - Q7 (pregnancy) passes about half the time. A likely fix is to have the bot write the employee's situation and what the policy covers before answering, as the judge does with its check lines, and hide those notes from the employee.
 - The judge may pass a soft borrowed rule (case E in `npm run judge:test`: "reporting damage to IT follows the same principle"). Run `try-judge` after any judge prompt change.
