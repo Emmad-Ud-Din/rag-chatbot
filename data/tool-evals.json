@@ -1,0 +1,22 @@
+[
+  {
+    "id": 1,
+    "question": "I joined on 2020-03-01 and used 8 days of annual leave this year. How many days do I have left?",
+    "expect": { "joinDate": "2020-03-01", "daysUsed": 8, "carriedOver": 0, "baseDays": 20, "increasedDays": 25, "yearsNeeded": 5, "maxCarryOver": 5, "carryOverExpires": "03-31" }
+  },
+  {
+    "id": 2,
+    "question": "How many sick days do I get?",
+    "expect": null
+  },
+  {
+    "id": 3,
+    "question": "I joined ages ago and took 8 days. How many are left?",
+    "expect": null
+  },
+  {
+    "id": 4,
+    "question": "I joined on 2020-03-01, carried over 7 days from last year and used 8 days this year. How many days do I have left?",
+    "expect": { "joinDate": "2020-03-01", "daysUsed": 8, "carriedOver": 7, "maxCarryOver": 5 }
+  }
+]
