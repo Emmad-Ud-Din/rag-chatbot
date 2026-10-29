@@ -119,7 +119,8 @@ app/
 lib/
   chunk.ts         handbook -> chunks
   embed.ts         text -> vectors (Voyage), with retry on 429
-  retrieve.ts      question -> top k chunks
+  retrieve.ts      question -> top k chunks (optionally reranked)
+  rerank.ts        Voyage reranker: reorders vector-search candidates
   answer.ts        chunks + question -> LLM (with tool loop) -> answer
   tools.ts         leave calculator and its schema for the model
   rewrite.ts       turns a follow-up into a standalone question for retrieval
@@ -169,6 +170,14 @@ Keeping the two apart tells you what to fix. Low hit rate means chunking or embe
 A question can list several sections (`"sections": [7, 8, 9]`) when a full answer needs more than one. Retrieval then gets two scores: **full coverage**, the share of questions where every needed section was in the top 3 (can the bot answer completely?), and **recall**, the share of needed sections found, averaged over questions. Full coverage alone hides progress: finding 2 of 3 sections instead of 1 still scores 0, while recall goes from 0.33 to 0.67. For a one-section question the two are the same.
 
 `npm run evals -- --retrieval-only` checks only which sections come back: no answers, no judge, no Groq tokens. Use it while changing how retrieval works.
+
+### Retrieval experiments
+
+Sections 15 to 18 (contractors, part-time staff, the Berlin office, forms and systems) were added to make retrieval harder in a realistic way, with questions Q26 to Q31 for them. Retrieval-only baseline with plain vector search: full coverage 23/27, recall 0.91, down from 21/21 and 1.00.
+
+The new sections were found fine, including the form codes (HR-17, FIN-04). What broke were older questions: the near-duplicate sections crowded the right ones out of the top 3. Q3 ("How many days can I take off?") lost section 2 to the Berlin and part-time sections, Q24 lost section 5, Q21 lost the meal allowance to the forms section, and Q31 missed the forms section.
+
+Reranking (`RERANK=1`): vector search returns the top 10, and Voyage's `rerank-2.5` reads the question with each one and keeps the best 3. It targets exactly this case, sections that look alike as vectors.
 
 ### Status
 
