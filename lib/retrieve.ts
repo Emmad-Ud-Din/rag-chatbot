@@ -24,7 +24,7 @@ function cosine(a: number[], b: number[]): number {
 
 // Reranking is switched on with RERANK=1, so the same evals can run with and
 // without it and be compared before it becomes the default.
-const RERANK = process.env.RERANK === "1";
+export const RERANK = process.env.RERANK === "1";
 // How many vector-search results the reranker gets to choose from. The right
 // section has to be somewhere in this list for the reranker to find it.
 const RERANK_CANDIDATES = 10;

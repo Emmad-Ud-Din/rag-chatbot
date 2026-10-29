@@ -1,4 +1,4 @@
-import { retrieve } from "./retrieve";
+import { RERANK, retrieve } from "./retrieve";
 import { calculateLeave, leaveTool } from "./tools";
 import { logRequest, promptVersion } from "./log";
 import { describeError, streamGroq } from "./groq";
@@ -76,6 +76,8 @@ export async function* answerStream(
     promptVersion: PROMPT_VERSION,
     question,
     historyLength: history.length,
+    // Which retrieval ran, so runs with and without reranking can be compared.
+    retrieval: RERANK ? "vector+rerank" : "vector",
   };
   // Every tool call the model made, with its result, for evals and the log.
   const toolCalls: ToolCall[] = [];
