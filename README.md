@@ -166,6 +166,10 @@ Two numbers come out of a run:
 
 Keeping the two apart tells you what to fix. Low hit rate means chunking or embeddings. Good hit rate with bad answers means the prompt or model.
 
+A question can list several sections (`"sections": [7, 8, 9]`) when a full answer needs more than one. Retrieval then gets two scores: **full coverage**, the share of questions where every needed section was in the top 3 (can the bot answer completely?), and **recall**, the share of needed sections found, averaged over questions. Full coverage alone hides progress: finding 2 of 3 sections instead of 1 still scores 0, while recall goes from 0.33 to 0.67. For a one-section question the two are the same.
+
+`npm run evals -- --retrieval-only` checks only which sections come back: no answers, no judge, no Groq tokens. Use it while changing how retrieval works.
+
 ### Status
 
 First full run: retrieval 7/7. Four answers failed (Q1, Q3, Q5, Q7), but reading them showed the chatbot was mostly right and the judge was too strict. Fix: the judge now receives the retrieved sections, and it only demands the facts the question needs.

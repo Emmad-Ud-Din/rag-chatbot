@@ -1,17 +1,21 @@
 import fs from "fs";
 import { answer } from "../lib/answer";
 import { judge } from "../lib/judge";
+import { retrieve } from "../lib/retrieve";
 
 type EvalItem = {
   id: number;
   question: string;
   reference: string;
-  section: number | null;
+  // The section that holds the answer, or null if the handbook does not cover it.
+  section?: number | null;
+  // For questions that need several sections, e.g. [7, 8, 9]. Use this or `section`.
+  sections?: number[];
   type: string;
 };
 
 // Groq's free tier allows about 8,000 tokens per minute on this model,
-// so wait between questions.
+// so wait between questions. Retrieval-only runs make no Groq calls and skip it.
 const PAUSE_MS = 45000;
 
 // Flags sentences like "the handbook does not specify ...". The bot only sees the
@@ -21,14 +25,35 @@ const PAUSE_MS = 45000;
 const ABSENCE =
   /(does not|doesn.t)( \w+)? (mention|specify|provide|state|cover|address|give|include|say)/i;
 
+// The sections a question needs, or [] if the handbook does not cover it.
+function neededSections(e: EvalItem): number[] {
+  if (e.sections) return e.sections;
+  return e.section == null ? [] : [e.section];
+}
+
+// How well retrieval did on one question, given the sections it returned.
+// - found: needed sections that were retrieved
+// - recall: share of needed sections found (partial credit, moves when retrieval gets closer)
+// - full: true only if every needed section was found (can the bot answer completely?)
+function scoreRetrieval(needed: number[], got: number[]) {
+  const found = needed.filter((s) => got.includes(s));
+  return { found, recall: found.length / needed.length, full: found.length === needed.length };
+}
+
 async function main() {
   const evals: EvalItem[] = JSON.parse(
     fs.readFileSync("data/evals.json", "utf-8")
   );
 
-  // Optional: run only some ids, e.g. `npx.cmd tsx --env-file=.env.local scripts/run-evals.ts 10 8`.
-  // With no ids, all questions run. Saves tokens when checking one question.
-  const only = process.argv.slice(2).map(Number);
+  // Usage:
+  //   npx.cmd tsx --env-file=.env.local scripts/run-evals.ts              all questions
+  //   npx.cmd tsx --env-file=.env.local scripts/run-evals.ts 10 8         only these ids
+  //   npx.cmd tsx --env-file=.env.local scripts/run-evals.ts --retrieval-only
+  // --retrieval-only checks which sections come back and nothing else: no answer,
+  // no judge, no Groq tokens, no pause. Use it while changing how retrieval works.
+  const args = process.argv.slice(2);
+  const retrievalOnly = args.includes("--retrieval-only");
+  const only = args.filter((a) => !a.startsWith("--")).map(Number);
   const selected = only.length
     ? evals.filter((e) => only.includes(e.id))
     : evals;
@@ -39,25 +64,42 @@ async function main() {
   }
 
   let scorable = 0;
-  let hits = 0;
+  let fullCoverage = 0;
+  let recallSum = 0;
   let passes = 0;
   let absenceClaims = 0;
 
   for (const [i, e] of selected.entries()) {
-    const result = await answer(e.question);
-    const sections = result.chunks.map((c) => c.section);
+    const needed = neededSections(e);
 
-    // Retrieval is scored only for questions that have a source section.
+    let result: Awaited<ReturnType<typeof answer>> | null = null;
+    let sections: number[];
+    if (retrievalOnly) {
+      sections = (await retrieve(e.question)).map((c) => c.section);
+    } else {
+      result = await answer(e.question);
+      sections = result.chunks.map((c) => c.section);
+    }
+
+    // Retrieval is scored only for questions that need at least one section.
     let retrieval = "n/a";
-    if (e.section !== null) {
+    if (needed.length > 0) {
       scorable++;
-      const rank = sections.indexOf(e.section);
-      if (rank !== -1) {
-        hits++;
-        retrieval = `rank ${rank + 1}`;
-      } else {
-        retrieval = "MISS";
-      }
+      const score = scoreRetrieval(needed, sections);
+      recallSum += score.recall;
+      if (score.full) fullCoverage++;
+      retrieval =
+        needed.length === 1
+          ? score.full
+            ? `rank ${sections.indexOf(needed[0]) + 1}`
+            : "MISS"
+          : `${score.found.length}/${needed.length} sections` +
+            (score.full ? "" : ` (missing ${needed.filter((s) => !score.found.includes(s)).join(", ")})`);
+    }
+
+    if (!result) {
+      console.log(`Q${e.id} retrieval: ${retrieval} | needed: [${needed.join(", ")}] | got: [${sections.join(", ")}]`);
+      continue;
     }
 
     // The judge sees the same sections the chatbot saw, plus the full handbook
@@ -86,9 +128,12 @@ async function main() {
     }
   }
 
-  console.log(`\nRetrieval hit rate: ${hits}/${scorable}`);
-  console.log(`Answer correctness: ${passes}/${selected.length}`);
-  console.log(`Answerable questions with absence claims: ${absenceClaims}`);
+  console.log(`\nRetrieval full coverage: ${fullCoverage}/${scorable} (every needed section in the top 3)`);
+  console.log(`Retrieval recall: ${scorable ? (recallSum / scorable).toFixed(2) : "n/a"} (share of needed sections found)`);
+  if (!retrievalOnly) {
+    console.log(`Answer correctness: ${passes}/${selected.length}`);
+    console.log(`Answerable questions with absence claims: ${absenceClaims}`);
+  }
 }
 
 main();
