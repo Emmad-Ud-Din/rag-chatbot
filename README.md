@@ -10,7 +10,7 @@ Try "How many sick days do I get?", or "I joined on 2020-03-01 and used 8 days o
 
 ## What it does
 
-- **Retrieval:** the handbook is split per section, embedded with Voyage, and the top 3 sections are picked by cosine similarity. No vector database: 18 chunks fit in memory.
+- **Retrieval:** the handbook is split per section and embedded with Voyage. Vector search picks the top 10 by cosine similarity, and a reranker keeps the best 3. No vector database: 18 chunks fit in memory.
 - **Answers** come from Groq and stream into a Next.js chat page, with status lines ("Checking your leave balance...") while it works.
 - **A leave calculator tool** does the date math and arithmetic. The model has no clock, so it calls the tool instead of guessing today's date.
 - **Follow-up questions:** a rewrite step turns "what if I take 3 more" into a full question before searching the handbook.
@@ -119,7 +119,7 @@ app/
 lib/
   chunk.ts         handbook -> chunks
   embed.ts         text -> vectors (Voyage), with retry on 429
-  retrieve.ts      question -> top k chunks (optionally reranked)
+  retrieve.ts      question -> top 10 by vector search -> reranked top 3
   rerank.ts        Voyage reranker: reorders vector-search candidates
   answer.ts        chunks + question -> LLM (with tool loop) -> answer
   tools.ts         leave calculator and its schema for the model
@@ -177,7 +177,16 @@ Sections 15 to 18 (contractors, part-time staff, the Berlin office, forms and sy
 
 The new sections were found fine, including the form codes (HR-17, FIN-04). What broke were older questions: the near-duplicate sections crowded the right ones out of the top 3. Q3 ("How many days can I take off?") lost section 2 to the Berlin and part-time sections, Q24 lost section 5, Q21 lost the meal allowance to the forms section, and Q31 missed the forms section.
 
-Reranking (`RERANK=1`): vector search returns the top 10, and Voyage's `rerank-2.5` reads the question with each one and keeps the best 3. It targets exactly this case, sections that look alike as vectors.
+Reranking: vector search returns the top 10, and Voyage's `rerank-2.5` reads the question with each one and keeps the best 3. It targets exactly this case, sections that look alike as vectors.
+
+Results:
+- Retrieval-only, all questions: full coverage 23/27 to 27/27, recall 0.91 to 1.00. All four broken questions got their sections back, two others moved up, and none got worse.
+- Full eval on the four affected questions (Q3, Q21, Q24, Q31): 0/4 to 4/4 answers correct. Without reranking the missing sections led to false claims, such as "the handbook does not contain any policy on parental leave".
+- Cost, from `scripts/log-stats.ts` (4 requests each, so approximate): the first word arrived about 1 second later (1,960 ms to 2,980 ms), with the same Groq tokens.
+
+Reranking is now on by default (`RERANK=0` turns it off for experiments). If the rerank call fails, retrieval falls back to the vector-search order instead of failing the request, with no retry, and the log records `"retrieval": "vector (rerank failed)"` and the error.
+
+Hybrid search (adding keyword search) was not added: its main use is exact terms, and the form-code questions (Q26, Q27) were already found at rank 1 by vector search alone. There was nothing in the evals for it to fix.
 
 ### Status
 
@@ -232,7 +241,7 @@ Known weak spots:
 
 ## Next steps
 
-- Retrieval quality: eval questions that need several sections, then hybrid search (keywords plus vectors) and reranking
+- More retrieval questions that are hard in new ways, since the current ones are back at full coverage with reranking
 - Make the calculator call reliable on follow-ups, for example by requiring it with `tool_choice`
 - Port follow-up questions to the `python-vers` branch
 - Leave calculator: first-year proration, once HR answers the "accrues monthly" question

@@ -1,4 +1,4 @@
-import { RERANK, retrieve } from "./retrieve";
+import { retrieve, retrieveWithInfo } from "./retrieve";
 import { calculateLeave, leaveTool } from "./tools";
 import { logRequest, promptVersion } from "./log";
 import { describeError, streamGroq } from "./groq";
@@ -76,8 +76,6 @@ export async function* answerStream(
     promptVersion: PROMPT_VERSION,
     question,
     historyLength: history.length,
-    // Which retrieval ran, so runs with and without reranking can be compared.
-    retrieval: RERANK ? "vector+rerank" : "vector",
   };
   // Every tool call the model made, with its result, for evals and the log.
   const toolCalls: ToolCall[] = [];
@@ -96,7 +94,12 @@ export async function* answerStream(
     }
 
     yield { type: "status", text: "Looking up the handbook..." };
-    const chunks = await retrieve(searchQuestion);
+    const retrieved = await retrieveWithInfo(searchQuestion);
+    const chunks = retrieved.chunks;
+    // Which retrieval actually ran, so runs with and without reranking can be
+    // compared, and a rerank failure shows up even though the answer still worked.
+    log.retrieval = retrieved.mode;
+    if (retrieved.error) log.rerankError = retrieved.error;
     log.sections = chunks.map((c) => ({ section: c.section, score: Number(c.score.toFixed(3)) }));
     const context = chunks.map((c) => c.text).join("\n\n---\n\n");
 
