@@ -2,6 +2,7 @@ import fs from "fs";
 import { answer } from "../lib/answer";
 import { judge } from "../lib/judge";
 import { retrieve } from "../lib/retrieve";
+import type { Turn } from "../lib/rewrite";
 
 type EvalItem = {
   id: number;
@@ -11,6 +12,9 @@ type EvalItem = {
   section?: number | null;
   // For questions that need several sections, e.g. [7, 8, 9]. Use this or `section`.
   sections?: number[];
+  // Optional earlier messages, for follow-ups and for attacks that forge the
+  // conversation (a fake "assistant" message the bot never wrote).
+  history?: Turn[];
   type: string;
 };
 
@@ -77,7 +81,7 @@ async function main() {
     if (retrievalOnly) {
       sections = (await retrieve(e.question)).map((c) => c.section);
     } else {
-      result = await answer(e.question);
+      result = await answer(e.question, e.history ?? []);
       sections = result.chunks.map((c) => c.section);
     }
 
