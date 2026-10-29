@@ -142,8 +142,51 @@
   {
     "id": 21,
     "question": "I am traveling for work, what can I claim and how fast?",
-    "reference": "Business travel must be booked through the company travel portal. Economy class is required for flights under 6 hours. For flights over 6 hours, premium economy is allowed. Hotel stays are reimbursed up to 180 USD per night in standard cities and 250 USD per night in high-cost cities such as New York, London, and Tokyo. During business travel, employees receive a daily meal allowance of 60 USD. This covers breakfast, lunch, and dinner. Alcohol is not reimbursable. Meals with clients can be claimed separately with an itemized receipt and the names of attendees. Expense claims must be submitted within 30 days of the expense. Claims over 100 USD require a receipt. Claims submitted after 30 days are rejected unless a manager approves an exception in writing. Reimbursement is paid with the next monthly payroll.",
-    "section": 7,
+    "reference": "Hotel up to 180 USD a night in standard cities and 250 in high-cost cities, a daily meal allowance of 60 USD, and flights booked through the travel portal (economy under 6 hours). Claims must be submitted within 30 days, with a receipt for anything over 100 USD, and are paid with the next monthly payroll. Alcohol, client meals and flight class details are optional.",
+    "sections": [
+      7,
+      8,
+      9
+    ],
+    "type": "answerable"
+  },
+  {
+    "id": 22,
+    "question": "How long can I work from my house and when will I be reimbursed for my home office setup?",
+    "reference": "Remote work is allowed up to 3 days per week; fully remote needs department head approval and is reviewed every 6 months. There is a one-time home office stipend of 500 USD, available within the first 90 days of employment. The handbook does not say how or when the stipend is paid, and the answer must say so. It must not present the expense claim rules (30 days, next payroll) as the way the stipend is paid. Being reachable during core hours is optional.",
+    "sections": [
+      6
+    ],
+    "type": "partial"
+  },
+  {
+    "id": 23,
+    "question": "Will I get my own laptop and when is the perfomance review?",
+    "reference": "Yes, every new employee gets a company laptop. Performance reviews happen twice a year, in June and December. Laptop replacement every 3 years, the other equipment rules and the review details are optional.",
+    "sections": [
+      10,
+      13
+    ],
+    "type": "answerable"
+  },
+  {
+    "id": 24,
+    "question": "What is the policy for parental leave and what happens if I am sick for more than 10 days in a year?",
+    "reference": "Primary caregivers get 16 weeks of paid parental leave and secondary caregivers 6 weeks; it must begin within 6 months of the birth or adoption. Employees get 10 paid sick days a year. The handbook does not say what happens after the 10 days are used, and the answer must say so. Splitting parental leave into two blocks and the doctor's note rule are optional.",
+    "sections": [
+      5,
+      3
+    ],
+    "type": "partial"
+  },
+  {
+    "id": 25,
+    "question": "Can I use my learning budget to go to a conference in London, and what will the hotel cost me?",
+    "reference": "Yes: the learning budget of 1,200 USD per year covers conferences. Conference travel is covered separately under the travel policy, not from the learning budget. London is a high-cost city, so the hotel is reimbursed up to 250 USD per night; anything above that is paid by the employee. Booking through the travel portal and the flight rules are optional.",
+    "sections": [
+      14,
+      7
+    ],
     "type": "answerable"
   }
 ]
