@@ -59,3 +59,19 @@ Performance reviews take place twice a year, in June and December. Each review c
 ## 14. Learning Budget
 
 Each employee has a learning budget of 1,200 USD per year for courses, books, and conferences. Unused budget does not roll over. Conference travel is covered separately under the travel policy.
+
+## 15. Contractors
+
+Contractors receive 10 days of paid annual leave per contract year. This does not increase with length of service, and unused days cannot be carried over. Contractors do not receive paid sick leave; sick days are unpaid and must be reported to the contractor's manager on the same day. Contractors are not eligible for the learning budget or the home office stipend. Contractors receive a company laptop, which must be returned on the last day of the contract.
+
+## 16. Part-Time Employees
+
+Part-time employees receive annual leave and sick leave in proportion to their contracted days. For example, an employee contracted for 3 days per week receives 12 days of annual leave and 6 paid sick days per year. All other leave rules, including carry-over and the doctor's note requirement, are the same as for full-time employees.
+
+## 17. Berlin Office
+
+Employees employed by the Berlin office receive 28 days of paid annual leave per calendar year, which does not increase with length of service. Instead of the company list, the Berlin office observes the public holidays of the state of Berlin. Sick leave rules are the same as for other employees, except that a doctor's note is required from the third consecutive day of absence.
+
+## 18. Forms and Systems
+
+Leave of any kind is requested in Atlas, the HR portal. Annual leave requests longer than 5 consecutive days use form HR-17, which must be submitted at least two weeks in advance. Parental leave is announced with form HR-22, at least 8 weeks before the leave starts. Business travel is booked in Compass, the company travel portal. Expense claims are submitted in Ledger using form FIN-04. Lost or stolen equipment is reported to IT with form IT-09.
