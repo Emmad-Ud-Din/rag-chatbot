@@ -1,6 +1,32 @@
-# rag-chatbot
+# Handbook Assistant
 
-A small RAG chatbot over a fictional company handbook (Northwind Labs), built to learn AI engineering. It comes with an eval harness that scores retrieval and answer quality separately.
+A chatbot that answers employee questions from a company handbook. I built it to learn AI engineering end to end: retrieval, evals, tool use, and running it in production. The handbook is fictional (Northwind Labs).
+
+**Live demo:** https://rag-chatbot-eosin-eight.vercel.app/
+
+Try "How many sick days do I get?", or "I joined on 2020-03-01 and used 8 days of annual leave. How many are left?" followed by "what if I take 3 more". Each visitor can ask 10 questions every 10 minutes.
+
+**Stack:** Next.js 15, TypeScript, Groq (`gpt-oss-120b`), Voyage AI embeddings, Upstash Redis, Vercel. A Python version of the core is on the `python-vers` branch.
+
+## What it does
+
+- **Retrieval:** the handbook is split per section, embedded with Voyage, and the top 3 sections are picked by cosine similarity. No vector database: 14 chunks fit in memory.
+- **Answers** come from Groq and stream into a Next.js chat page, with status lines ("Checking your leave balance...") while it works.
+- **A leave calculator tool** does the date math and arithmetic. The model has no clock, so it calls the tool instead of guessing today's date.
+- **Follow-up questions:** a rewrite step turns "what if I take 3 more" into a full question before searching the handbook.
+- **Evals:** 21 handbook questions graded by an LLM judge, separate retrieval and answer scores, tool-argument checks, and unit tests for the calculator.
+- **Production basics:** request logs, retries with backoff, streaming, rate limiting, and friendly error messages.
+
+## What the evals taught me
+
+- **A score can hide a lot.** Lowering the model's reasoning effort cost one point (20/21 to 19/21), but reading the answers showed five got worse, including a bug I had already fixed coming back.
+- **A right answer can come from the wrong process.** On a follow-up question the bot answered "14 days" correctly while skipping the calculator and doing the math itself. Only a check on the tool arguments caught it, and that shortcut breaks as soon as dates matter.
+- **The judge needs testing too.** The LLM judge passed and failed the same flawed answer on different runs. Giving it the full handbook, making it write one check line per claim, and combining those checks in code made it more consistent, though not perfectly. Judgment calls like "does this detail matter?" stayed unreliable, so those go to a regex flag and a human look instead.
+- **Some failures were in the tests, not the bot.** One test case had sloppy wording, and one date check broke on a look-alike hyphen. New tests were made to fail first, so I knew they could catch the problem they were written for.
+- **Change one thing at a time.** Some fixes looked right and changed nothing (more reasoning effort on the rewrite step), and one rule in the wrong place made a question worse (0 of 3 runs). Each change was measured on its own and reverted when it did not help.
+- **Serverless changes where state can live.** Log files, an in-memory rate limit counter and a gitignored index all break on Vercel. They moved to the console, Redis and git.
+
+The sections below are the working notes: how each part works, every eval run, and the known weak spots.
 
 ## How it works
 
@@ -46,10 +72,26 @@ npm run dev        # then open http://localhost:3000
 
 On Windows behind a proxy or antivirus, set `NODE_USE_SYSTEM_CA=1` first, as for the scripts. Next.js reads the keys from `.env.local` by itself.
 
-- `app/api/chat/route.ts` takes `{ "question": "..." }` and sends `answerStream()` events back as NDJSON, one JSON event per line, as soon as each happens. The `done` event reaches the browser without the retrieved text or tool calls, which stay in the server log. Errors become `{ "type": "error" }` with the friendly message. If the employee closes the page mid-answer, the stream is cancelled and the request is still logged.
-- **Follow-up questions:** the page sends the conversation so far with each question, and the route keeps the last 6 messages. The model sees those turns before the new question, so it knows what "what if I take 3 more" refers to. Retrieval needs more: embedding "what if I take 3 more" on its own finds the wrong sections, and joining it with the earlier messages drags the old topic along when the employee changes subject ("and what about sick days?"). So `lib/rewrite.ts` first rewrites a follow-up into a question that stands on its own, and retrieval searches with that. The rewrite is a separate call with `reasoning_effort: "low"`, which is fine for this simple task even though it hurt answer quality. The first message in a chat skips it. The log records `rewrittenQuestion` and `historyLength`. Tool evals T5 and T6 are follow-ups: T5 ("what if i take 3 more") checks that the rewrite keeps the join date and the 8 days and that the tool gets `daysUsed: 11`; T6 ("and what about sick days?") checks that the rewrite drops the annual leave topic and the tool is not called. The first live run of T5 gave the right answer (14 days) but failed both checks: the rewrite lost the details and the model subtracted 17 - 3 itself. Fixes, one at a time: `reasoning_effort: "medium"` on the rewrite changed nothing (reverted). Telling the rewriter who reads its output (a system that has not seen the conversation) and not to rely on earlier answers made it keep the join date and the 8 days. A sentence at the end of the reminder ("call calculate_leave ... even if an earlier answer already gave a number") raised tool use on T5 from 0/5 to 5/8. The answer was 14 every time, so only the tool eval tells these runs apart; skipping the tool matters when dates do (carry-over expiry, anniversaries). A regression check (tool evals 1-4 and 6, evals 7, 10 and 19) showed no new failures.
+- `app/api/chat/route.ts` takes `{ "question": "...", "history": [...] }` and sends `answerStream()` events back as NDJSON, one JSON event per line, as soon as each happens. The `done` event reaches the browser without the retrieved text or tool calls, which stay in the server log. Errors become `{ "type": "error" }` with the friendly message. If the employee closes the page mid-answer, the stream is cancelled and the request is still logged.
 - `package.json` has an `overrides` entry for `postcss`. Next.js 15 bundles PostCSS 8.4.31, which `npm audit` flags (XSS and file-read issues that need attacker-controlled CSS; this project only processes its own `globals.css`). The override swaps in a fixed 8.5.x without moving to Next.js 16. Remove it after upgrading Next.js.
 - `app/page.tsx` shows status lines while waiting, adds each text piece as it arrives, and renders the bold text and lists the model writes as React elements, never as raw HTML. It tells employees that questions are kept for 30 days.
+
+## Follow-up questions
+
+The page sends the conversation so far with each question, and the route keeps the last 6 messages. The model sees those turns before the new question, so it knows what "what if I take 3 more" refers to.
+
+Retrieval needs more. Embedding "what if I take 3 more" on its own finds the wrong sections, and joining it with the earlier messages drags the old topic along when the employee changes subject ("and what about sick days?"). So `lib/rewrite.ts` first rewrites a follow-up into a question that stands on its own, and retrieval searches with that. The rewrite is a separate call with `reasoning_effort: "low"`, which is fine for this simple task even though it hurt answer quality. The first message in a chat skips it. The log records `rewrittenQuestion` and `historyLength`.
+
+Tool evals T5 and T6 are follow-ups:
+- T5 ("what if i take 3 more") checks that the rewrite keeps the join date and the 8 days, and that the tool gets `daysUsed: 11`.
+- T6 ("and what about sick days?") checks that the rewrite drops the annual leave topic and that the tool is not called.
+
+The first live run of T5 gave the right answer (14 days) but failed both checks: the rewrite lost the details, and the model subtracted 17 - 3 itself. Fixes, one at a time:
+- `reasoning_effort: "medium"` on the rewrite changed nothing, so it was reverted.
+- Telling the rewriter who reads its output (a system that has not seen the conversation), and not to rely on earlier answers, made it keep the join date and the 8 days.
+- A sentence at the end of the reminder ("call calculate_leave ... even if an earlier answer already gave a number") raised tool use on T5 from 0/5 to 5/8.
+
+The answer was 14 every time, so only the tool eval tells these runs apart. Skipping the tool matters when dates do (carry-over expiry, anniversaries). A regression check (tool evals 1-4 and 6, evals 7, 10 and 19) showed no new failures.
 
 ## Deploying to Vercel
 
@@ -177,7 +219,7 @@ Known weak spots:
 
 ## Next steps
 
-- Run `npm run evals` on the 21 questions and read every answer, not only the FAILs
-- Add more held-out questions, including ones that need several sections
+- Retrieval quality: eval questions that need several sections, then hybrid search (keywords plus vectors) and reranking
+- Make the calculator call reliable on follow-ups, for example by requiring it with `tool_choice`
+- Port follow-up questions to the `python-vers` branch
 - Leave calculator: first-year proration, once HR answers the "accrues monthly" question
-- Later: reranking, hybrid search, structured outputs
