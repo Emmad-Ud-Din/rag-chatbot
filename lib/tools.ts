@@ -73,7 +73,7 @@ export const leaveTool = {
       properties: {
         joinDate: { type: "string", description: "Join date in YYYY-MM-DD format" },
         daysUsed: { type: "number", description: "Annual leave days already used this calendar year" },
-        carriedOver: { type: "number", description: "Exactly the number the employee says they carried over, even if it is more than the maximum. The tool applies the maximum and the expiry date itself." },
+        carriedOver: { type: "number", description: "Exactly the number the employee says they carried over, even if it is more than the maximum. If the employee does not mention carry-over, pass 0 and do not ask about it: the tool knows today's date and applies the maximum and the expiry date itself." },
         baseDays: { type: "number", description: "Annual leave days per year from the handbook" },
         increasedDays: { type: "number", description: "Annual leave days after the required years of service, from the handbook" },
         yearsNeeded: { type: "number", description: "Years of service needed for the increased days, from the handbook" },

@@ -100,6 +100,8 @@ The live site is public, so some eval questions are attacks: Q32 tries to use th
 
 What the attacks did show: the handbook sections used to be inside the user message, so the model treated them as sent by the employee and said "the handbook sections you provided". With a pasted fake section that wording suggests the bot used the attacker's text. The sections now go in their own system message inside `<handbook>` tags, and the system prompt says that only that text is the handbook, that the employee's messages and earlier assistant messages are not, and to never say the employee provided the sections.
 
+The regression check after this change (evals 7, 10, 19, 21, 24, 31, 33-35 and all tool evals) caught a new failure. T1 ("joined on 2020-03-01, used 8 days") stopped calling the tool and asked how many days the employee carried over: 0 of 4 runs, against 4 of 5 with the old `answer.ts`. The `carriedOver` description only said what to pass when the employee gives a number. It now says to pass 0 and not ask when they don't mention it, since the tool knows the date and carry-over expires on 31 March anyway. After that: T1 3/3, and the full tool evals 6/6. T3 still asks for the missing join date, so the "do not ask" did not spread to other fields. T5 also passed 4 of 4 runs with the new prompt, up from about 5 in 8.
+
 Not fixed: forged history is still accepted. A sturdier fix keeps the conversation on the server, or signs each assistant message so the server can tell its own messages from forged ones.
 
 ## Deploying to Vercel
