@@ -188,5 +188,60 @@
       7
     ],
     "type": "answerable"
+  },
+  {
+    "id": 26,
+    "question": "My manager told me to fill in HR-17. What is it for and when does it need to be in?",
+    "reference": "HR-17 is the form for annual leave requests longer than 5 consecutive days, and it must be submitted at least two weeks in advance. Requesting it in Atlas, the HR portal, is optional.",
+    "sections": [
+      18
+    ],
+    "type": "answerable"
+  },
+  {
+    "id": 27,
+    "question": "Where do I put in a FIN-04?",
+    "reference": "FIN-04 is the expense claim form, and it is submitted in Ledger. The expense claim rules (within 30 days, receipts over 100 USD, paid with the next payroll) are optional.",
+    "sections": [
+      18
+    ],
+    "type": "answerable"
+  },
+  {
+    "id": 28,
+    "question": "I'm here on a contract, not as a regular employee. How many days off do I get a year?",
+    "reference": "Contractors get 10 days of paid annual leave per contract year. It does not increase with length of service and unused days cannot be carried over. The answer must not give the employee entitlement of 20 or 25 days as the contractor's. The carry-over detail is optional.",
+    "sections": [
+      15
+    ],
+    "type": "answerable"
+  },
+  {
+    "id": 29,
+    "question": "I only work Mondays, Wednesdays and Fridays. How many paid sick days do I have?",
+    "reference": "Part-time employees get sick leave in proportion to their contracted days, so someone working 3 days a week gets 6 paid sick days per year. The doctor's note rule is optional.",
+    "sections": [
+      16
+    ],
+    "type": "answerable"
+  },
+  {
+    "id": 30,
+    "question": "I work from our Berlin office and I've been off sick for 3 days now. Do I need to see a doctor?",
+    "reference": "Yes. In the Berlin office a doctor's note is required from the third consecutive day of absence. The answer must not apply the general rule (a note only for absences longer than 3 days) to a Berlin employee.",
+    "sections": [
+      17
+    ],
+    "type": "answerable"
+  },
+  {
+    "id": 31,
+    "question": "I'm based in Berlin and want to take 7 days off in a row in August. How many days do I get a year, and how do I ask for this?",
+    "reference": "Berlin employees get 28 days of paid annual leave per year. The request is made in Atlas, the HR portal, and because it is longer than 5 consecutive days it needs form HR-17, submitted at least two weeks in advance.",
+    "sections": [
+      17,
+      18
+    ],
+    "type": "answerable"
   }
 ]
