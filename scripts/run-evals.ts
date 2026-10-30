@@ -121,6 +121,7 @@ async function main() {
       console.log("   situation:", result.notes.employeeSituation);
       console.log("   covered:", result.notes.policyCoverage);
       console.log("   not covered:", result.notes.notCovered);
+      console.log("   gap matters:", result.notes.gapMatters);
     }
     console.log("   answer:", result.answer);
     console.log("   judge:", verdict.reason);

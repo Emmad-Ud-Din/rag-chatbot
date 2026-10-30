@@ -53,12 +53,17 @@ const ANSWER_SCHEMA = {
         type: "string",
         description: "The part of the employee's situation that falls outside what the policies cover, or \"nothing\" if the policies fully answer it.",
       },
+      gapMatters: {
+        type: "string",
+        enum: ["yes", "no"],
+        description: "yes if the answer to the employee would be different depending on what the handbook said about the notCovered part; no if the policies already answer the question either way, or notCovered is \"nothing\".",
+      },
       answer: {
         type: "string",
-        description: "The answer to the employee, following all the rules. If notCovered is not \"nothing\", the answer must say clearly that this part is not covered.",
+        description: "The answer to the employee, following all the rules. If gapMatters is yes, the answer must say that the notCovered part is not covered, in the same words as notCovered. If gapMatters is no, do not mention notCovered.",
       },
     },
-    required: ["employeeSituation", "policyCoverage", "notCovered", "answer"],
+    required: ["employeeSituation", "policyCoverage", "notCovered", "gapMatters", "answer"],
     additionalProperties: false,
   },
 };
@@ -89,7 +94,7 @@ type Chunk = Awaited<ReturnType<typeof retrieve>>[number];
 export type AnswerResult = {
   answer: string;
   // Only in the STRUCTURED experiment: the fields the model filled in before answering.
-  notes?: { employeeSituation: string; policyCoverage: string; notCovered: string };
+  notes?: { employeeSituation: string; policyCoverage: string; notCovered: string; gapMatters: string };
   chunks: Chunk[];
   toolCalls: ToolCall[];
   searchQuestion: string;
