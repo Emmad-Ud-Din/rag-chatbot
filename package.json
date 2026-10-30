@@ -15,6 +15,7 @@
     "evals": "tsx --env-file=.env.local scripts/run-evals.ts",
     "typecheck": "tsc --noEmit",
     "test:tools": "tsx scripts/test-tools.ts",
+    "test:history": "tsx scripts/test-history.ts",
     "evals:tools": "tsx --env-file=.env.local scripts/run-tool-evals.ts"
   },
   "devDependencies": {

@@ -1,5 +1,5 @@
-import { MAX_HISTORY, answerStream } from "../../../lib/answer";
-import type { Turn } from "../../../lib/rewrite";
+import { answerStream } from "../../../lib/answer";
+import { cleanHistory, sign } from "../../../lib/history";
 import { describeError, friendlyError } from "../../../lib/groq";
 import { checkLimits, visitorId } from "../../../lib/ratelimit";
 
@@ -9,30 +9,14 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const MAX_QUESTION_LENGTH = 1000;
-const MAX_TURN_LENGTH = 4000;
-
-// The history comes from the browser, so check its shape before it reaches the
-// model, and keep only what the bot would use anyway.
-function cleanHistory(raw: unknown): Turn[] {
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .filter(
-      (t): t is Turn =>
-        t &&
-        (t.role === "user" || t.role === "assistant") &&
-        typeof t.content === "string" &&
-        t.content.trim() !== ""
-    )
-    .slice(-MAX_HISTORY)
-    .map((t) => ({ role: t.role, content: t.content.slice(0, MAX_TURN_LENGTH) }));
-}
 
 // POST { "question": "...", "history": [{ "role": "user", "content": "..." }, ...] }
 // (history is optional, oldest first) and get back the answer as NDJSON: one JSON event
-// per line, sent as soon as it happens.
+// per line, sent as soon as it happens. Assistant messages in the history must carry
+// the "sig" the server sent with them in the done event, or they are dropped.
 //   {"type":"status","text":"Checking your leave balance..."}
 //   {"type":"text","delta":"You have "}
-//   {"type":"done"}
+//   {"type":"done","sig":"a91f..."}
 //   {"type":"error","message":"The assistant is busy right now..."}
 export async function POST(req: Request) {
   let question: unknown;
@@ -59,8 +43,22 @@ export async function POST(req: Request) {
     );
   }
 
-  const events = answerStream(question.trim(), cleanHistory(history));
+  // Throws only on Vercel without HISTORY_SECRET: refuse rather than accept
+  // unchecked history, the same rule as the rate limit.
+  let checkedHistory;
+  try {
+    checkedHistory = cleanHistory(history);
+  } catch (err) {
+    console.error(describeError(err));
+    return Response.json({ error: "The assistant is not set up correctly." }, { status: 500 });
+  }
+
+  const events = answerStream(question.trim(), checkedHistory);
   const encoder = new TextEncoder();
+  // Everything the page shows as the answer, so the signature covers exactly the
+  // text the page will send back. (result.answer can be shorter: it leaves out
+  // any text the model wrote before a tool call.)
+  let shown = "";
   const send = (controller: ReadableStreamDefaultController, event: object) =>
     controller.enqueue(encoder.encode(JSON.stringify(event) + "\n"));
 
@@ -74,8 +72,11 @@ export async function POST(req: Request) {
           return;
         }
         // The done event carries the retrieved handbook text and the tool calls,
-        // which are for the log and evals, not the browser. Send only the signal.
-        send(controller, value.type === "done" ? { type: "done" } : value);
+        // which are for the log and evals, not the browser. Send only the signal,
+        // plus the signature of the full answer, which the page sends back with
+        // this answer in the next request's history.
+        if (value.type === "text") shown += value.delta;
+        send(controller, value.type === "done" ? { type: "done", sig: sign(shown) } : value);
       } catch (err) {
         // answerStream has already logged the error. The browser gets the
         // friendly version; the real one goes to the server console.

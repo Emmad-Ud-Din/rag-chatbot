@@ -34,7 +34,9 @@ const MAX_STEPS = 3;
 
 // How many earlier messages (questions and answers) the model sees. Every one is
 // resent on every request, so more history means more tokens and a slower answer.
-export const MAX_HISTORY = 6;
+// Defined in history.ts, next to the code that trims the history.
+import { MAX_HISTORY } from "./history";
+export { MAX_HISTORY };
 
 // Changes whenever the prompt, the reminder or the tool description changes.
 const PROMPT_VERSION = promptVersion(SYSTEM_PROMPT, REMINDER, JSON.stringify(leaveTool), REWRITE_PROMPT);

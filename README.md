@@ -102,7 +102,15 @@ What the attacks did show: the handbook sections used to be inside the user mess
 
 The regression check after this change (evals 7, 10, 19, 21, 24, 31, 33-35 and all tool evals) caught a new failure. T1 ("joined on 2020-03-01, used 8 days") stopped calling the tool and asked how many days the employee carried over: 0 of 4 runs, against 4 of 5 with the old `answer.ts`. The `carriedOver` description only said what to pass when the employee gives a number. It now says to pass 0 and not ask when they don't mention it, since the tool knows the date and carry-over expires on 31 March anyway. After that: T1 3/3, and the full tool evals 6/6. T3 still asks for the missing join date, so the "do not ask" did not spread to other fields. T5 called the tool in 4 of 5 runs with the new prompt, up from about 5 in 8 (a small sample).
 
-Not fixed: forged history is still accepted. A sturdier fix keeps the conversation on the server, or signs each assistant message so the server can tell its own messages from forged ones.
+Forged history (Q34) is now blocked by signing (`lib/history.ts`). When an answer finishes, the server computes an HMAC of its text with a secret only the server has (`HISTORY_SECRET`) and sends it with the `done` event. The page sends it back with that answer in the next request's history. The server recomputes it, and drops any assistant message whose signature is missing or does not match, so a forged or edited answer never reaches the model. Decisions:
+- Only assistant messages are signed. The employee writes the user messages anyway, so faking one gains nothing.
+- A bad message is dropped, not rejected. After the secret changes, real conversations lose their context instead of breaking.
+- The signature covers exactly the text the page showed, and is checked in constant time (`timingSafeEqual`).
+- On Vercel without `HISTORY_SECRET` the chat refuses requests, like the rate limit. Locally a random secret is made at startup.
+
+Q34 could not test this: it already passed, because the bot ignored the fake 40 days. `npm run test:history` checks what the fix changes, which messages reach the model. Written first and run against the old behaviour, it failed 3 of 5 cases (forged, edited, made-up signature), then passed 5 of 5.
+
+Not covered: a real signed answer can be replayed into a different conversation, since the signature covers only the text. That answer was written by the bot from the handbook, so the risk is small.
 
 ## Deploying to Vercel
 
@@ -114,7 +122,7 @@ Some things that work on a laptop don't on serverless hosting, where each reques
 - **Rate limiting** (`lib/ratelimit.ts`): 10 questions per visitor (by IP) per 10 minutes, and 60 a day for everyone, which keeps a public link from using up the Groq daily allowance or running up the Voyage bill. The counts live in Upstash Redis, because a counter in memory would reset with every new function copy and could not add up across copies running at once. On Vercel without the Redis keys, the chat refuses requests instead of running unlimited. Locally, without keys, there is no limit.
 - Set a spending limit in the Voyage dashboard as a final backstop.
 
-Environment variables on Vercel: `GROQ_API_KEY`, `VOYAGE_API_KEY`, and the Upstash pair (`UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`, or the `KV_REST_API_URL` and `KV_REST_API_TOKEN` the Vercel integration creates).
+Environment variables on Vercel: `GROQ_API_KEY`, `VOYAGE_API_KEY`, `HISTORY_SECRET` (any long random string), and the Upstash pair (`UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`, or the `KV_REST_API_URL` and `KV_REST_API_TOKEN` the Vercel integration creates).
 
 ## Project layout
 

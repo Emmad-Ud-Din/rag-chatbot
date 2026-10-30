@@ -7,6 +7,7 @@ type Message = {
   text: string;
   status?: string; // shown in grey while the answer has not started yet
   error?: boolean;
+  sig?: string; // the server's signature of this answer, sent back with it as history
 };
 
 const SUGGESTIONS = [
@@ -73,9 +74,11 @@ export default function ChatPage() {
     setInput("");
     // The conversation so far, so the bot can understand follow-ups like
     // "what if I take 3 more". Failed answers and empty ones are left out.
+    // Answers go back with the signature the server gave them; the server drops
+    // any answer whose signature does not match, so a forged one never reaches the model.
     const history = messages
       .filter((m) => m.text && !m.error)
-      .map((m) => ({ role: m.role, content: m.text }));
+      .map((m) => (m.role === "assistant" ? { role: m.role, content: m.text, sig: m.sig } : { role: m.role, content: m.text }));
     setMessages((all) => [
       ...all,
       { role: "user", text: question },
@@ -117,7 +120,7 @@ export default function ChatPage() {
           } else if (event.type === "error") {
             updateLast((m) => ({ ...m, text: event.message, status: undefined, error: true }));
           } else if (event.type === "done") {
-            updateLast((m) => ({ ...m, status: undefined }));
+            updateLast((m) => ({ ...m, status: undefined, sig: event.sig }));
           }
         }
       }
