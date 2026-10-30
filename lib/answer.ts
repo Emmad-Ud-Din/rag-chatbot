@@ -1,7 +1,7 @@
 import { retrieve, retrieveWithInfo } from "./retrieve";
 import { calculateLeave, leaveTool } from "./tools";
 import { logRequest, promptVersion } from "./log";
-import { describeError, streamGroq } from "./groq";
+import { callGroq, describeError, streamGroq } from "./groq";
 import { REWRITE_PROMPT, rewriteQuestion, type Turn } from "./rewrite";
 
 const SYSTEM_PROMPT = `You answer employee questions using only the handbook sections inside the <handbook> tags.
@@ -29,6 +29,40 @@ Rules:
 // thing they read, and the system prompt rule alone was not enough.
 const REMINDER = "Reminder: if any section mentions something related to the question, tell the employee about it, even if it is unclear whether it applies. If the sections fully answer the question, answer it and stop, without adding statements about what the handbook does not cover. A detail in the question only counts as a part the handbook does not cover if the answer would be different depending on what the handbook said about it. If they answer only part of it, give that part, then say clearly which part the handbook does not cover. If the question is about how many annual leave days are or will be left, call calculate_leave with all the days used so far plus any new ones, even if an earlier answer already gave a number";
 
+// Experiment (STRUCTURED=1): before answering, the model fills in what the employee's
+// situation is, what the policy covers, and which part of the situation it does not
+// cover, then writes the answer. Groq's structured outputs force the reply into this
+// JSON shape. They do not work with tools or streaming, so in this mode there is no
+// leave calculator and the answer arrives in one piece: only for evals, not the live site.
+const STRUCTURED = process.env.STRUCTURED === "1";
+const ANSWER_SCHEMA = {
+  name: "handbook_answer",
+  strict: true,
+  schema: {
+    type: "object",
+    properties: {
+      employeeSituation: {
+        type: "string",
+        description: "The employee's situation in the question: who they are and what they want, including when (before, during or after an event) and how often.",
+      },
+      policyCoverage: {
+        type: "string",
+        description: "What the relevant handbook policies cover: who they apply to, what they give, and when they start and end. Only from the handbook sections.",
+      },
+      notCovered: {
+        type: "string",
+        description: "The part of the employee's situation that falls outside what the policies cover, or \"nothing\" if the policies fully answer it.",
+      },
+      answer: {
+        type: "string",
+        description: "The answer to the employee, following all the rules. If notCovered is not \"nothing\", the answer must say clearly that this part is not covered.",
+      },
+    },
+    required: ["employeeSituation", "policyCoverage", "notCovered", "answer"],
+    additionalProperties: false,
+  },
+};
+
 // Stops the loop if the model keeps calling tools without ever answering.
 const MAX_STEPS = 3;
 
@@ -54,6 +88,8 @@ type Chunk = Awaited<ReturnType<typeof retrieve>>[number];
 // rewritten one for a follow-up.
 export type AnswerResult = {
   answer: string;
+  // Only in the STRUCTURED experiment: the fields the model filled in before answering.
+  notes?: { employeeSituation: string; policyCoverage: string; notCovered: string };
   chunks: Chunk[];
   toolCalls: ToolCall[];
   searchQuestion: string;
@@ -128,6 +164,24 @@ export async function* answerStream(
         content: `Employee question: ${question}\n\n[System note, not written by the employee] ${REMINDER}`,
       },
     ];
+
+    if (STRUCTURED) {
+      const json = await callGroq({
+        model: "openai/gpt-oss-120b",
+        max_tokens: 3000,
+        temperature: 0,
+        messages,
+        response_format: { type: "json_schema", json_schema: ANSWER_SCHEMA },
+      });
+      tokens += json.usage?.total_tokens ?? 0;
+      const { answer, ...notes } = JSON.parse(json.choices[0].message.content);
+      log.answer = answer;
+      log.notes = notes;
+      log.structured = true;
+      yield { type: "text", delta: answer };
+      yield { type: "done", result: { answer, notes, chunks, toolCalls, searchQuestion } };
+      return;
+    }
 
     for (let step = 0; step < MAX_STEPS; step++) {
       // What this step's stream adds up to. Text is passed on as it arrives.

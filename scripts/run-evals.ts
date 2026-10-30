@@ -20,7 +20,8 @@ type EvalItem = {
 
 // Groq's free tier allows about 8,000 tokens per minute on this model,
 // so wait between questions. Retrieval-only runs make no Groq calls and skip it.
-const PAUSE_MS = 45000;
+// On a paid tier with higher limits, set PAUSE_MS=0 (or a few seconds).
+const PAUSE_MS = Number(process.env.PAUSE_MS ?? 45000);
 
 // Flags sentences like "the handbook does not specify ...". The bot only sees the
 // top 3 sections, so a claim about what the whole handbook lacks can be false, and
@@ -116,6 +117,11 @@ async function main() {
       `Q${e.id} [${e.type}] retrieval: ${retrieval} | answer: ${verdict.pass ? "PASS" : "FAIL"}`
     );
     console.log("   sections:", sections);
+    if (result.notes) {
+      console.log("   situation:", result.notes.employeeSituation);
+      console.log("   covered:", result.notes.policyCoverage);
+      console.log("   not covered:", result.notes.notCovered);
+    }
     console.log("   answer:", result.answer);
     console.log("   judge:", verdict.reason);
 
