@@ -245,7 +245,7 @@ Q7 experiments (structured outputs vs. reasoning steps):
 - `STRUCTURED=1` makes the model fill in `employeeSituation`, `policyCoverage`, `notCovered` and `gapMatters` as forced JSON (Groq structured outputs) before writing `answer`. Groq does not support structured outputs with tools or streaming, so this mode has no leave calculator and is for evals only.
 - Q7 went from about half to 4/4, and every answer named the timing gap ("during pregnancy (pre-birth)"). The fields also showed where things went wrong: in one run `notCovered` found the gap and the answer then dropped it, which pass/fail alone would never show.
 - It made judgment calls worse. `gapMatters` invented a gap for Q10 and brought back the sofa disclaimer, the same unreliable "does this matter?" call as the judge's `matters`. Q19 lost the $500 stipend when `policyCoverage` said "the relevant policies"; changing it to "related ... even if unclear" brought the stipend back in 2 of 3 runs, one of which guessed it "could be used".
-- The same three steps as hidden reasoning in the system prompt (no JSON, tools and streaming kept): Q7 1/3, one answer claiming parental leave "covers pregnancy and birth". Reverted. Writing the steps out was what helped, not the steps themselves.
+- Baseline on the current prompt, for comparison: Q7 1/3, and one failing answer claims parental leave "covers pregnancy and birth". The same three steps as hidden reasoning in the system prompt (no JSON, tools and streaming kept) are being tested next.
 - Not shipped: it fixes Q7 but costs the calculator and streaming and hurts Q10 and Q19.
 
 Known weak spots:
