@@ -47,7 +47,7 @@ const ANSWER_SCHEMA = {
       },
       policyCoverage: {
         type: "string",
-        description: "What the relevant handbook policies cover: who they apply to, what they give, and when they start and end. Only from the handbook sections.",
+        description: "What the handbook policies related to the question cover, including any benefit that might apply even if it is unclear whether it does: who they apply to, what they give, and when they start and end. Only from the handbook sections.",
       },
       notCovered: {
         type: "string",
