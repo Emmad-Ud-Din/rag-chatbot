@@ -1,0 +1,35 @@
+# The model-graded evals: answers vary between runs, so they are not a pass/fail
+# gate. Start them by hand (Actions tab -> Evals -> Run workflow) and read the output.
+name: Evals
+
+on:
+  workflow_dispatch:
+    inputs:
+      ids:
+        description: "Question ids to run, separated by spaces (empty = all)"
+        required: false
+        default: ""
+
+jobs:
+  evals:
+    runs-on: ubuntu-latest
+    env:
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+      PAUSE_MS: "3000"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # The ids go through an environment variable, not straight into the command,
+      # so text typed into the input box can't run as shell code.
+      - name: Answer evals
+        run: npx tsx scripts/run-evals.ts $IDS
+        env:
+          IDS: ${{ inputs.ids }}
+      - name: Tool evals
+        if: always()
+        run: npx tsx scripts/run-tool-evals.ts

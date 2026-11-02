@@ -16,6 +16,7 @@
     "typecheck": "tsc --noEmit",
     "test:tools": "tsx scripts/test-tools.ts",
     "test:history": "tsx scripts/test-history.ts",
+    "ci:retrieval": "tsx scripts/run-evals.ts --retrieval-only --strict",
     "evals:tools": "tsx --env-file=.env.local scripts/run-tool-evals.ts"
   },
   "devDependencies": {

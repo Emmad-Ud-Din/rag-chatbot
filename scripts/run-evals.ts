@@ -54,10 +54,13 @@ async function main() {
   //   npx.cmd tsx --env-file=.env.local scripts/run-evals.ts              all questions
   //   npx.cmd tsx --env-file=.env.local scripts/run-evals.ts 10 8         only these ids
   //   npx.cmd tsx --env-file=.env.local scripts/run-evals.ts --retrieval-only
+  //   ... --retrieval-only --strict   exit with an error if any question misses a
+  //                                   needed section (used by CI)
   // --retrieval-only checks which sections come back and nothing else: no answer,
   // no judge, no Groq tokens, no pause. Use it while changing how retrieval works.
   const args = process.argv.slice(2);
   const retrievalOnly = args.includes("--retrieval-only");
+  const strict = args.includes("--strict");
   const only = args.filter((a) => !a.startsWith("--")).map(Number);
   const selected = only.length
     ? evals.filter((e) => only.includes(e.id))
@@ -73,6 +76,7 @@ async function main() {
   let recallSum = 0;
   let passes = 0;
   let absenceClaims = 0;
+  const missed: number[] = [];
 
   for (const [i, e] of selected.entries()) {
     const needed = neededSections(e);
@@ -93,6 +97,7 @@ async function main() {
       const score = scoreRetrieval(needed, sections);
       recallSum += score.recall;
       if (score.full) fullCoverage++;
+      else missed.push(e.id);
       retrieval =
         needed.length === 1
           ? score.full
@@ -144,6 +149,13 @@ async function main() {
   if (!retrievalOnly) {
     console.log(`Answer correctness: ${passes}/${selected.length}`);
     console.log(`Answerable questions with absence claims: ${absenceClaims}`);
+  }
+
+  // Retrieval gives the same result every run, so any miss is a real change, not
+  // noise: fail on the first one instead of allowing a margin.
+  if (strict && missed.length > 0) {
+    console.error(`\nFAIL: questions missing a needed section: ${missed.map((id) => `Q${id}`).join(", ")}`);
+    process.exit(1);
   }
 }
 
