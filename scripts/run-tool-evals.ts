@@ -4,8 +4,8 @@ import type { Turn } from "../lib/rewrite";
 
 // Checks that the model calls calculate_leave with the right arguments, or does
 // not call it when it shouldn't. Exact comparisons, no judge.
-// The final number depends on today's date, the arguments do not, so this is
-// what the eval checks. The tool's math is covered by scripts/test-tools.ts.
+// The final number depends on today's date, so it is checked against the tool's own
+// result, not a stored value. The tool's math is covered by scripts/test-tools.ts.
 // Usage: npx.cmd tsx --env-file=.env.local scripts/run-tool-evals.ts [ids]
 
 type ToolEval = {
@@ -51,6 +51,15 @@ async function main() {
         if (call.args?.[key] !== value) {
           problems.push(`${key}: expected ${JSON.stringify(value)}, got ${JSON.stringify(call.args?.[key])}`);
         }
+      }
+      // Right arguments do not guarantee a right answer: the model can still ignore
+      // the tool's result and write its own number. The number depends on today's
+      // date, so it is not in tool-evals.json; the tool's own result is the reference.
+      // \b keeps "1" from matching inside "17". It cannot tell which number the answer
+      // calls the balance, so an answer with both the right and a wrong number passes.
+      const remaining = (call.result as any)?.remaining;
+      if (typeof remaining === "number" && !new RegExp(`\\b${remaining}\\b`).test(result.answer)) {
+        problems.push(`answer does not contain the tool's result (${remaining} remaining): the model ignored or changed it`);
       }
     }
 
