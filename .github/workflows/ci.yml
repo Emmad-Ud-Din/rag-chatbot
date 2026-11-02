@@ -27,5 +27,6 @@ jobs:
               run: npm run ci:retrieval
               env:
                 VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+                RERANK: "0"
             - name: build
               run: npm run build
